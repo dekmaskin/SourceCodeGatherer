@@ -48,39 +48,35 @@
             </Grid>
         </GroupBox>
 
-        <!-- File Types Selection -->
-        <GroupBox Grid.Row="1" Header="File Types" Margin="0,0,0,10">
-            <Grid Margin="10">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Text="Select file types to include:" 
-                           Margin="0,0,0,5"/>
-                <Button Grid.Row="1" Content="Scan Directory" 
-                        Command="{Binding ScanDirectoryCommand}"
-                        HorizontalAlignment="Left"/>
-            </Grid>
-        </GroupBox>
-
         <!-- File Extensions List -->
-        <GroupBox Grid.Row="2" Header="Available File Extensions" Margin="0,0,0,10">
+        <GroupBox Grid.Row="1" Header="File Types" Margin="0,0,0,10" 
+                  Grid.RowSpan="2">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
-                <ItemsControl ItemsSource="{Binding FileExtensions}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox Content="{Binding Extension}" 
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Select file types to include:" 
+                               Margin="0,0,0,10"
+                               Visibility="{Binding FileTypesVisibility}"/>
+
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding FileExtensions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Extension}" 
                                       IsChecked="{Binding IsChecked}"
                                       Margin="5,2"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </ScrollViewer>
         </GroupBox>
 
@@ -112,14 +108,18 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" 
                        VerticalAlignment="Center" Foreground="Green"/>
-            <Button Grid.Column="1" Content="Export" 
+            <Button Grid.Column="1" Content="Export to Clipboard" 
+                    Command="{Binding ExportToClipboardCommand}"
+                    IsEnabled="{Binding CanExport}"/>
+            <Button Grid.Column="2" Content="Export to File" 
                     Command="{Binding ExportCommand}"
                     IsEnabled="{Binding CanExport}"/>
-            <Button Grid.Column="2" Content="Close" 
+            <Button Grid.Column="3" Content="Close" 
                     Click="CloseButton_Click"/>
         </Grid>
     </Grid>
