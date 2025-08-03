@@ -18,7 +18,7 @@ A professional Windows desktop application for collecting and exporting source c
 ## 📋 Prerequisites
 
 - Windows 10 or later
-- [.NET 9.0 Runtime](https://dotnet.microsoft.com/download/dotnet/6.0) or later
+- [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/6.0) or later
 
 ## 🛠️ Installation
 
