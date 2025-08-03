@@ -3,37 +3,49 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using SourceCodeGatherer.Commands;
+using SourceCodeGatherer.Models;
+using SourceCodeGatherer.Services;
 
-namespace SourceCodeGatherer
+namespace SourceCodeGatherer.ViewModels
 {
     /// <summary>
     /// ViewModel for the main window, implementing MVVM pattern for source code gathering.
     /// </summary>
-    public class MainViewModel : INotifyPropertyChanged
+    public class MainViewModel : BaseViewModel
     {
+        private readonly IFileService _fileService;
         private string _rootPath;
         private string _outputPath;
         private bool _isProcessing;
         private string _statusMessage;
         private Visibility _progressVisibility = Visibility.Collapsed;
+        private Visibility _fileTypesVisibility = Visibility.Collapsed;
 
         /// <summary>
         /// Initializes a new instance of the MainViewModel class.
         /// </summary>
-        public MainViewModel()
+        public MainViewModel() : this(new FileService())
         {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the MainViewModel class with dependency injection.
+        /// </summary>
+        /// <param name="fileService">The file service.</param>
+        public MainViewModel(IFileService fileService)
+        {
+            _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
+
             FileExtensions = new ObservableCollection<FileExtensionItem>();
-            BrowseRootCommand = new RelayCommand(ExecuteBrowseRoot);
-            BrowseOutputCommand = new RelayCommand(ExecuteBrowseOutput);
-            ScanDirectoryCommand = new RelayCommand(ExecuteScanDirectory, CanExecuteScanDirectory);
-            ExportCommand = new RelayCommand(ExecuteExport, CanExecuteExport);
+            InitializeCommands();
             StatusMessage = "Select a root directory to begin.";
         }
+
+        #region Properties
 
         /// <summary>
         /// Gets or sets the root path for scanning source files.
@@ -43,11 +55,18 @@ namespace SourceCodeGatherer
             get => _rootPath;
             set
             {
-                _rootPath = value;
-                OnPropertyChanged();
-                UpdateDefaultOutputPath();
-                OnPropertyChanged(nameof(CanExport));
-                CommandManager.InvalidateRequerySuggested();
+                if (SetProperty(ref _rootPath, value))
+                {
+                    UpdateDefaultOutputPath();
+                    OnPropertyChanged(nameof(CanExport));
+                    CommandManager.InvalidateRequerySuggested();
+
+                    // Automatically scan directory when path is set
+                    if (!string.IsNullOrWhiteSpace(value) && Directory.Exists(value))
+                    {
+                        _ = ScanDirectoryAsync();
+                    }
+                }
             }
         }
 
@@ -59,10 +78,11 @@ namespace SourceCodeGatherer
             get => _outputPath;
             set
             {
-                _outputPath = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CanExport));
-                CommandManager.InvalidateRequerySuggested();
+                if (SetProperty(ref _outputPath, value))
+                {
+                    OnPropertyChanged(nameof(CanExport));
+                    CommandManager.InvalidateRequerySuggested();
+                }
             }
         }
 
@@ -74,9 +94,10 @@ namespace SourceCodeGatherer
             get => _isProcessing;
             set
             {
-                _isProcessing = value;
-                OnPropertyChanged();
-                ProgressVisibility = value ? Visibility.Visible : Visibility.Collapsed;
+                if (SetProperty(ref _isProcessing, value))
+                {
+                    ProgressVisibility = value ? Visibility.Visible : Visibility.Collapsed;
+                }
             }
         }
 
@@ -86,11 +107,7 @@ namespace SourceCodeGatherer
         public string StatusMessage
         {
             get => _statusMessage;
-            set
-            {
-                _statusMessage = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _statusMessage, value);
         }
 
         /// <summary>
@@ -99,11 +116,16 @@ namespace SourceCodeGatherer
         public Visibility ProgressVisibility
         {
             get => _progressVisibility;
-            set
-            {
-                _progressVisibility = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _progressVisibility, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the visibility of the file types text.
+        /// </summary>
+        public Visibility FileTypesVisibility
+        {
+            get => _fileTypesVisibility;
+            set => SetProperty(ref _fileTypesVisibility, value);
         }
 
         /// <summary>
@@ -117,23 +139,7 @@ namespace SourceCodeGatherer
                                !string.IsNullOrWhiteSpace(OutputPath) &&
                                FileExtensions.Any(x => x.IsChecked);
 
-                // Update status message to guide user
-                if (!string.IsNullOrWhiteSpace(RootPath) && !string.IsNullOrWhiteSpace(OutputPath))
-                {
-                    if (FileExtensions.Count == 0)
-                    {
-                        StatusMessage = "Click 'Scan Directory' to find file types.";
-                    }
-                    else if (!FileExtensions.Any(x => x.IsChecked))
-                    {
-                        StatusMessage = "Select at least one file type to export.";
-                    }
-                    else
-                    {
-                        StatusMessage = "Ready to export.";
-                    }
-                }
-
+                UpdateStatusMessage();
                 return canExport;
             }
         }
@@ -143,10 +149,45 @@ namespace SourceCodeGatherer
         /// </summary>
         public ObservableCollection<FileExtensionItem> FileExtensions { get; }
 
-        public ICommand BrowseRootCommand { get; }
-        public ICommand BrowseOutputCommand { get; }
-        public ICommand ScanDirectoryCommand { get; }
-        public ICommand ExportCommand { get; }
+        #endregion
+
+        #region Commands
+
+        public ICommand BrowseRootCommand { get; private set; }
+        public ICommand BrowseOutputCommand { get; private set; }
+        public ICommand ExportCommand { get; private set; }
+        public ICommand ExportToClipboardCommand { get; private set; }
+
+        #endregion
+
+        #region Private Methods
+
+        private void InitializeCommands()
+        {
+            BrowseRootCommand = new RelayCommand(ExecuteBrowseRoot);
+            BrowseOutputCommand = new RelayCommand(ExecuteBrowseOutput);
+            ExportCommand = new RelayCommand(ExecuteExport, CanExecuteExport);
+            ExportToClipboardCommand = new RelayCommand(ExecuteExportToClipboard, CanExecuteExport);
+        }
+
+        private void UpdateStatusMessage()
+        {
+            if (!string.IsNullOrWhiteSpace(RootPath) && !string.IsNullOrWhiteSpace(OutputPath))
+            {
+                if (FileExtensions.Count == 0)
+                {
+                    StatusMessage = "Scanning directory for file types...";
+                }
+                else if (!FileExtensions.Any(x => x.IsChecked))
+                {
+                    StatusMessage = "Select at least one file type to export.";
+                }
+                else
+                {
+                    StatusMessage = "Ready to export.";
+                }
+            }
+        }
 
         private void ExecuteBrowseRoot()
         {
@@ -187,57 +228,59 @@ namespace SourceCodeGatherer
             }
         }
 
-        private bool CanExecuteScanDirectory()
-        {
-            return !string.IsNullOrWhiteSpace(RootPath) && Directory.Exists(RootPath);
-        }
-
-        private async void ExecuteScanDirectory()
+        private async Task ScanDirectoryAsync()
         {
             IsProcessing = true;
             FileExtensions.Clear();
+            FileTypesVisibility = Visibility.Collapsed;
             StatusMessage = "Scanning directory...";
 
             try
             {
-                await Task.Run(() =>
+                var extensions = await _fileService.GetFileExtensionsAsync(RootPath);
+
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    var extensions = Directory.GetFiles(RootPath, "*.*", SearchOption.AllDirectories)
-                        .Select(f => Path.GetExtension(f).ToLower())
-                        .Where(ext => !string.IsNullOrWhiteSpace(ext) && IsTextFile(ext))
-                        .Distinct()
-                        .OrderBy(ext => ext);
-
-                    Application.Current.Dispatcher.Invoke(() =>
+                    foreach (var ext in extensions)
                     {
-                        foreach (var ext in extensions)
-                        {
-                            var item = new FileExtensionItem { Extension = ext };
-                            item.PropertyChanged += (s, e) =>
-                            {
-                                if (e.PropertyName == nameof(FileExtensionItem.IsChecked))
-                                {
-                                    OnPropertyChanged(nameof(CanExport));
-                                    CommandManager.InvalidateRequerySuggested();
-                                }
-                            };
-                            FileExtensions.Add(item);
-                        }
-                        OnPropertyChanged(nameof(CanExport));
-                    });
-                });
+                        var item = new FileExtensionItem { Extension = ext };
+                        item.PropertyChanged += OnFileExtensionItemPropertyChanged;
+                        FileExtensions.Add(item);
+                    }
 
-                StatusMessage = $"Found {FileExtensions.Count} file types.";
+                    if (FileExtensions.Count > 0)
+                    {
+                        FileTypesVisibility = Visibility.Visible;
+                        StatusMessage = $"Found {FileExtensions.Count} file types. Select the ones to include.";
+                    }
+                    else
+                    {
+                        StatusMessage = "No text files found in the selected directory.";
+                    }
+
+                    OnPropertyChanged(nameof(CanExport));
+                });
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error scanning directory: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusMessage = "Error occurred during scanning.";
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ShowError($"Error scanning directory: {ex.Message}");
+                    StatusMessage = "Error occurred during scanning.";
+                });
             }
             finally
             {
                 IsProcessing = false;
+            }
+        }
+
+        private void OnFileExtensionItemPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FileExtensionItem.IsChecked))
+            {
+                OnPropertyChanged(nameof(CanExport));
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -258,46 +301,48 @@ namespace SourceCodeGatherer
                     .Select(x => x.Extension)
                     .ToList();
 
-                await Task.Run(() =>
-                {
-                    using (var writer = new StreamWriter(OutputPath, false, Encoding.UTF8))
-                    {
-                        var files = Directory.GetFiles(RootPath, "*.*", SearchOption.AllDirectories)
-                            .Where(f => selectedExtensions.Contains(Path.GetExtension(f).ToLower()))
-                            .OrderBy(f => f);
-
-                        foreach (var file in files)
-                        {
-                            var relativePath = Path.GetRelativePath(RootPath, file);
-                            writer.WriteLine($"=== FILE: {relativePath} ===");
-                            writer.WriteLine();
-
-                            try
-                            {
-                                var content = File.ReadAllText(file);
-                                writer.WriteLine(content);
-                            }
-                            catch (Exception ex)
-                            {
-                                writer.WriteLine($"[ERROR READING FILE: {ex.Message}]");
-                            }
-
-                            writer.WriteLine();
-                            writer.WriteLine("=== END OF FILE ===");
-                            writer.WriteLine();
-                        }
-                    }
-                });
+                await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions);
 
                 StatusMessage = "Export completed successfully!";
-                MessageBox.Show("Export completed successfully!", "Success",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowSuccess("Export completed successfully!");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during export: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowError($"Error during export: {ex.Message}");
                 StatusMessage = "Error occurred during export.";
+            }
+            finally
+            {
+                IsProcessing = false;
+            }
+        }
+
+        private async void ExecuteExportToClipboard()
+        {
+            IsProcessing = true;
+            StatusMessage = "Exporting to clipboard...";
+
+            try
+            {
+                var selectedExtensions = FileExtensions
+                    .Where(x => x.IsChecked)
+                    .Select(x => x.Extension)
+                    .ToList();
+
+                var content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Clipboard.SetText(content);
+                });
+
+                StatusMessage = "Exported to clipboard successfully!";
+                ShowSuccess("Content has been copied to clipboard!");
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Error during clipboard export: {ex.Message}");
+                StatusMessage = "Error occurred during clipboard export.";
             }
             finally
             {
@@ -314,111 +359,23 @@ namespace SourceCodeGatherer
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
                 var date = DateTime.Now.ToString("yyyy-MM-dd");
-                var time = DateTime.Now.ToString("HH:mm:ss");
+                var time = DateTime.Now.ToString("HH-mm-ss");
                 OutputPath = Path.Combine(downloadsPath, $"{rootDirName}_{date}_{time}.txt");
                 OnPropertyChanged(nameof(CanExport));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
 
-        private bool IsTextFile(string extension)
+        private void ShowError(string message)
         {
-            var textExtensions = new[]
-            {
-                ".cs", ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
-                ".hpp", ".xml", ".json", ".yaml", ".yml", ".md", ".txt", ".html", ".css",
-                ".scss", ".sass", ".less", ".sql", ".sh", ".bat", ".ps1", ".rb", ".go",
-                ".rs", ".swift", ".kt", ".php", ".r", ".m", ".mm", ".scala", ".groovy",
-                ".lua", ".dart", ".vue", ".svelte", ".astro", ".ini", ".config", ".conf",
-                ".toml", ".properties", ".env", ".gitignore", ".dockerignore", ".editorconfig"
-            };
-
-            return textExtensions.Contains(extension.ToLower());
+            MessageBox.Show(message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private void ShowSuccess(string message)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    /// <summary>
-    /// Represents a file extension item with checkbox state.
-    /// </summary>
-    public class FileExtensionItem : INotifyPropertyChanged
-    {
-        private string _extension;
-        private bool _isChecked;
-
-        /// <summary>
-        /// Gets or sets the file extension.
-        /// </summary>
-        public string Extension
-        {
-            get => _extension;
-            set
-            {
-                _extension = value;
-                OnPropertyChanged();
-            }
+            MessageBox.Show(message, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        /// <summary>
-        /// Gets or sets whether this extension is selected.
-        /// </summary>
-        public bool IsChecked
-        {
-            get => _isChecked;
-            set
-            {
-                _isChecked = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    /// <summary>
-    /// Basic relay command implementation for MVVM pattern.
-    /// </summary>
-    public class RelayCommand : ICommand
-    {
-        private readonly Action _execute;
-        private readonly Func<bool> _canExecute;
-
-        /// <summary>
-        /// Initializes a new instance of the RelayCommand class.
-        /// </summary>
-        /// <param name="execute">The action to execute.</param>
-        /// <param name="canExecute">The function to determine if command can execute.</param>
-        public RelayCommand(Action execute, Func<bool> canExecute = null)
-        {
-            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-            _canExecute = canExecute;
-        }
-
-        public event EventHandler CanExecuteChanged
-        {
-            add { CommandManager.RequerySuggested += value; }
-            remove { CommandManager.RequerySuggested -= value; }
-        }
-
-        public bool CanExecute(object parameter)
-        {
-            return _canExecute?.Invoke() ?? true;
-        }
-
-        public void Execute(object parameter)
-        {
-            _execute();
-        }
+        #endregion
     }
 }
