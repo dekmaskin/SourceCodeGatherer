@@ -359,7 +359,7 @@ namespace SourceCodeGatherer.ViewModels
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
                 var date = DateTime.Now.ToString("yyyy-MM-dd");
-                var time = DateTime.Now.ToString("HH-mm-ss");
+                var time = DateTime.Now.ToString("HHmm");
                 OutputPath = Path.Combine(downloadsPath, $"{rootDirName}_{date}_{time}.txt");
                 OnPropertyChanged(nameof(CanExport));
                 CommandManager.InvalidateRequerySuggested();

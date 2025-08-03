@@ -19,7 +19,9 @@ namespace SourceCodeGatherer.Services
             ".scss", ".sass", ".less", ".sql", ".sh", ".bat", ".ps1", ".rb", ".go",
             ".rs", ".swift", ".kt", ".php", ".r", ".m", ".mm", ".scala", ".groovy",
             ".lua", ".dart", ".vue", ".svelte", ".astro", ".ini", ".config", ".conf",
-            ".toml", ".properties", ".env", ".gitignore", ".dockerignore", ".editorconfig"
+            ".toml", ".properties", ".env", ".gitignore", ".dockerignore", ".editorconfig",
+            ".csv", ".log", ".diff", ".patch", ".asm", ".pl", ".pm", ".hs", ".clj",
+            ".razor", ".fs", ".vb", ".vbs", ".asmx", ".aspx", ".jsp", ".jspx"
         };
 
         /// <inheritdoc/>
@@ -95,7 +97,6 @@ namespace SourceCodeGatherer.Services
 
             writer.WriteLine();
             writer.WriteLine("=== END OF FILE ===");
-            writer.WriteLine();
         }
     }
 }
