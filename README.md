@@ -2,7 +2,7 @@
 
 A professional Windows desktop application for collecting and exporting source code files from directory structures. Perfect for creating context files for AI models, code reviews, or documentation purposes.
 
-![.NET](https://img.shields.io/badge/.NET-9.0+-512BD4?style=flat-square&logo=dotnet)
+![.NET](https://img.shields.io/badge/.NET-8.0+-512BD4?style=flat-square&logo=dotnet)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
