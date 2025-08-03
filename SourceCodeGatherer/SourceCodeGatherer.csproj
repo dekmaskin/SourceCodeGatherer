@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ApplicationIcon>icons/app.ico</ApplicationIcon>
+		<AssemblyName>SourceCodeGatherer</AssemblyName>
+		<RootNamespace>SourceCodeGatherer</RootNamespace>
+		<Company>Your Company</Company>
+		<Product>Source Code Gatherer</Product>
+		<Description>A tool to gather source code files for AI context</Description>
+		<Version>1.0.0</Version>
+	</PropertyGroup>
+
+</Project>
