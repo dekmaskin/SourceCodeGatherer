@@ -199,6 +199,37 @@ namespace SourceCodeGatherer.ViewModels
         /// </summary>
         public ObservableCollection<string> RecentPaths { get; }
 
+        /// <summary>
+        /// Gets or sets the maximum file size in KB.
+        /// </summary>
+        public double MaxFileSizeKB
+        {
+            get => _settings?.MaxFileSizeKB ?? 10240;
+            set
+            {
+                if (_settings != null)
+                {
+                    var clampedValue = Math.Max(0, Math.Min(10240, value));
+                    if (Math.Abs(_settings.MaxFileSizeKB - clampedValue) > 0.01)
+                    {
+                        _settings.MaxFileSizeKB = clampedValue;
+                        OnPropertyChanged();
+                        OnPropertyChanged(nameof(MaxFileSizeMB));
+                        _ = SaveSettingsAsync();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum file size in MB for display.
+        /// </summary>
+        public double MaxFileSizeMB
+        {
+            get => MaxFileSizeKB / 1024.0;
+            set => MaxFileSizeKB = value * 1024.0;
+        }
+
         #endregion
 
         #region Commands
@@ -210,6 +241,8 @@ namespace SourceCodeGatherer.ViewModels
         public ICommand SelectRecentPathCommand { get; private set; }
         public ICommand RefreshStatisticsCommand { get; private set; }
         public ICommand SettingsCommand { get; private set; }
+        public ICommand HelpCommand { get; private set; }
+        public ICommand AboutCommand { get; private set; }
 
         #endregion
 
@@ -224,6 +257,8 @@ namespace SourceCodeGatherer.ViewModels
             SelectRecentPathCommand = new RelayCommand<string>(ExecuteSelectRecentPath);
             RefreshStatisticsCommand = new RelayCommand(ExecuteRefreshStatistics, CanExecuteExport);
             SettingsCommand = new RelayCommand(ExecuteSettings);
+            HelpCommand = new RelayCommand(ExecuteHelp);
+            AboutCommand = new RelayCommand(ExecuteAbout);
         }
 
         private async Task LoadSettingsAsync()
@@ -261,6 +296,10 @@ namespace SourceCodeGatherer.ViewModels
                 _settings = new AppSettings();
                 StatusMessage = "Select a root directory to begin.";
             }
+
+            // Notify property changes for max file size
+            OnPropertyChanged(nameof(MaxFileSizeKB));
+            OnPropertyChanged(nameof(MaxFileSizeMB));
         }
 
         private void UpdateStatusMessage()
@@ -332,7 +371,7 @@ namespace SourceCodeGatherer.ViewModels
 
             try
             {
-                var extensions = await _fileService.GetFileExtensionsAsync(RootPath, _settings?.ExcludedDirectories);
+                var extensions = await _fileService.GetFileExtensionsAsync(RootPath, _settings?.ExcludedDirectories, _settings?.AcceptedFileFormats);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -603,20 +642,145 @@ namespace SourceCodeGatherer.ViewModels
             }
         }
 
+        private void ExecuteHelp()
+        {
+            var helpWindow = new Views.HelpWindow()
+            {
+                Owner = Application.Current.MainWindow
+            };
+            helpWindow.ShowDialog();
+        }
+
+        private void ExecuteAbout()
+        {
+            var aboutMessage = "Source Code Gatherer\n\n" +
+                              "A tool for collecting and exporting source code files from a directory structure.\n\n" +
+                              "Features:\n" +
+                              "• Customizable file filtering\n" +
+                              "• Multiple export formats\n" +
+                              "• File size limits\n" +
+                              "• Streaming support for large exports\n\n" +
+                              "Version 1.0";
+
+            MessageBox.Show(aboutMessage, "About Source Code Gatherer", 
+                          MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
         private void UpdateDefaultOutputPath()
         {
             if (!string.IsNullOrWhiteSpace(RootPath) && Directory.Exists(RootPath))
             {
-                var rootDirName = new DirectoryInfo(RootPath).Name;
+                var projectName = GetProjectName(RootPath);
                 var downloadsPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
-                var date = DateTime.Now.ToString("yyyy-MM-dd");
-                var time = DateTime.Now.ToString("HHmm");
-                OutputPath = Path.Combine(downloadsPath, $"{rootDirName}_{date}_{time}.txt");
+                OutputPath = Path.Combine(downloadsPath, $"{projectName}.txt");
                 OnPropertyChanged(nameof(CanExport));
                 CommandManager.InvalidateRequerySuggested();
             }
+        }
+
+        /// <summary>
+        /// Gets the project name by detecting common project files, falling back to folder name.
+        /// </summary>
+        /// <param name="rootPath">The root directory path.</param>
+        /// <returns>The project name or folder name as fallback.</returns>
+        private string GetProjectName(string rootPath)
+        {
+            try
+            {
+                // Define project file patterns in order of preference
+                var projectFilePatterns = new[]
+                {
+                    "*.sln",        // Visual Studio Solution
+                    "*.csproj",     // C# Project
+                    "*.vbproj",     // VB.NET Project
+                    "*.fsproj",     // F# Project
+                    "package.json", // Node.js/JavaScript
+                    "pom.xml",      // Java Maven
+                    "build.gradle", // Java Gradle
+                    "Cargo.toml",   // Rust
+                    "go.mod",       // Go
+                    "pyproject.toml", // Python
+                    "setup.py",     // Python
+                    "composer.json", // PHP
+                    "Gemfile",      // Ruby
+                    "mix.exs"       // Elixir
+                };
+
+                foreach (var pattern in projectFilePatterns)
+                {
+                    var files = Directory.GetFiles(rootPath, pattern, SearchOption.TopDirectoryOnly);
+                    if (files.Length > 0)
+                    {
+                        var fileName = Path.GetFileNameWithoutExtension(files[0]);
+                        
+                        // For package.json, try to get the name from the JSON content
+                        if (pattern == "package.json")
+                        {
+                            var packageName = GetPackageJsonName(files[0]);
+                            if (!string.IsNullOrWhiteSpace(packageName))
+                                return SanitizeFileName(packageName);
+                        }
+                        
+                        return SanitizeFileName(fileName);
+                    }
+                }
+            }
+            catch
+            {
+                // If any error occurs during project detection, fall back to folder name
+            }
+
+            // Fallback to folder name
+            return SanitizeFileName(new DirectoryInfo(rootPath).Name);
+        }
+
+        /// <summary>
+        /// Extracts the project name from package.json file.
+        /// </summary>
+        /// <param name="packageJsonPath">Path to package.json file.</param>
+        /// <returns>The project name from package.json or null if not found.</returns>
+        private string GetPackageJsonName(string packageJsonPath)
+        {
+            try
+            {
+                var content = File.ReadAllText(packageJsonPath);
+                // Simple JSON parsing for the name field
+                var nameMatch = System.Text.RegularExpressions.Regex.Match(
+                    content, @"""name""\s*:\s*""([^""]+)""", 
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                
+                if (nameMatch.Success)
+                {
+                    return nameMatch.Groups[1].Value;
+                }
+            }
+            catch
+            {
+                // Ignore errors and return null
+            }
+            
+            return null;
+        }
+
+        /// <summary>
+        /// Sanitizes a filename by removing invalid characters.
+        /// </summary>
+        /// <param name="fileName">The filename to sanitize.</param>
+        /// <returns>A sanitized filename safe for use in file paths.</returns>
+        private string SanitizeFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return "project";
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = new string(fileName.Where(c => !invalidChars.Contains(c)).ToArray());
+            
+            // Replace common problematic characters with underscores
+            sanitized = sanitized.Replace(' ', '_').Replace('-', '_');
+            
+            return string.IsNullOrWhiteSpace(sanitized) ? "project" : sanitized;
         }
 
         private void ShowError(string message)
@@ -627,6 +791,21 @@ namespace SourceCodeGatherer.ViewModels
         private void ShowSuccess(string message)
         {
             MessageBox.Show(message, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private async Task SaveSettingsAsync()
+        {
+            if (_settings != null && _settingsService != null)
+            {
+                try
+                {
+                    await _settingsService.SaveSettingsAsync(_settings);
+                }
+                catch
+                {
+                    // Silently fail - settings are not critical
+                }
+            }
         }
 
         #endregion

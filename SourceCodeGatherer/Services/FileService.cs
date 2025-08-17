@@ -13,7 +13,7 @@ namespace SourceCodeGatherer.Services
     /// </summary>
     public class FileService : IFileService
     {
-        private readonly HashSet<string> _textExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private readonly HashSet<string> _defaultTextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             ".cs", ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
             ".hpp", ".xml", ".json", ".yaml", ".yml", ".md", ".txt", ".html", ".css",
@@ -26,15 +26,15 @@ namespace SourceCodeGatherer.Services
         };
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<string>> GetFileExtensionsAsync(string rootPath, IEnumerable<string> excludedDirectories = null)
+        public async Task<IEnumerable<string>> GetFileExtensionsAsync(string rootPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> acceptedFormats = null)
         {
             return await Task.Run(() =>
             {
                 var excludedDirs = excludedDirectories?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
                 
-                return GetFilteredFiles(rootPath, excludedDirs, null, long.MaxValue)
+                return GetFilteredFiles(rootPath, excludedDirs, null, long.MaxValue, acceptedFormats)
                     .Select(f => Path.GetExtension(f).ToLower())
-                    .Where(ext => !string.IsNullOrWhiteSpace(ext) && IsTextFile(ext))
+                    .Where(ext => !string.IsNullOrWhiteSpace(ext) && IsAcceptedFile(ext, acceptedFormats))
                     .Distinct()
                     .OrderBy(ext => ext);
             });
@@ -67,7 +67,7 @@ namespace SourceCodeGatherer.Services
             return await Task.Run(async () =>
             {
                 using var writer = new StringWriter();
-                var files = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, settings.MaxFileSizeBytes).ToList();
+                var files = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, settings.MaxFileSizeBytes, settings.AcceptedFileFormats).ToList();
                 
                 var progressInfo = new ExportProgress { TotalFiles = files.Count };
                 
@@ -107,7 +107,7 @@ namespace SourceCodeGatherer.Services
 
             return await Task.Run(() =>
             {
-                var allFiles = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, long.MaxValue).ToList();
+                var allFiles = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, long.MaxValue, settings.AcceptedFileFormats).ToList();
                 var validFiles = new List<string>();
                 var skippedFiles = 0;
                 long totalSize = 0;
@@ -149,7 +149,21 @@ namespace SourceCodeGatherer.Services
         /// <inheritdoc/>
         public bool IsTextFile(string extension)
         {
-            return _textExtensions.Contains(extension);
+            return _defaultTextExtensions.Contains(extension);
+        }
+
+        /// <summary>
+        /// Checks if a file extension is accepted based on settings.
+        /// </summary>
+        /// <param name="extension">The file extension to check.</param>
+        /// <param name="acceptedFormats">List of accepted file formats from settings.</param>
+        /// <returns>True if the extension is accepted.</returns>
+        public bool IsAcceptedFile(string extension, IEnumerable<string> acceptedFormats)
+        {
+            if (acceptedFormats == null || !acceptedFormats.Any())
+                return IsTextFile(extension);
+            
+            return acceptedFormats.Contains(extension, StringComparer.OrdinalIgnoreCase);
         }
 
         /// <inheritdoc/>
@@ -178,7 +192,7 @@ namespace SourceCodeGatherer.Services
             AppSettings settings, IProgress<ExportProgress> progress)
         {
             var extensionSet = new HashSet<string>(selectedExtensions, StringComparer.OrdinalIgnoreCase);
-            var files = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, settings.MaxFileSizeBytes).ToList();
+            var files = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, settings.MaxFileSizeBytes, settings.AcceptedFileFormats).ToList();
             
             var progressInfo = new ExportProgress { TotalFiles = files.Count };
 
@@ -213,7 +227,7 @@ namespace SourceCodeGatherer.Services
         /// Gets filtered files based on extensions, excluded directories, and size limits.
         /// </summary>
         private IEnumerable<string> GetFilteredFiles(string rootPath, IEnumerable<string> excludedDirectories, 
-            HashSet<string> extensionSet, long maxFileSize)
+            HashSet<string> extensionSet, long maxFileSize, IEnumerable<string> acceptedFormats)
         {
             var excludedDirs = excludedDirectories?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
 
@@ -227,8 +241,14 @@ namespace SourceCodeGatherer.Services
                     if (pathParts.Any(part => excludedDirs.Contains(part)))
                         return false;
 
+                    var extension = Path.GetExtension(file);
+
+                    // Check if file format is accepted
+                    if (!IsAcceptedFile(extension, acceptedFormats))
+                        return false;
+
                     // Check extension if specified
-                    if (extensionSet != null && !extensionSet.Contains(Path.GetExtension(file)))
+                    if (extensionSet != null && !extensionSet.Contains(extension))
                         return false;
 
                     // Check file size

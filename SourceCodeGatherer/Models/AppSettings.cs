@@ -32,9 +32,33 @@ namespace SourceCodeGatherer.Models
         };
 
         /// <summary>
+        /// Gets or sets the list of accepted file formats/extensions.
+        /// </summary>
+        public List<string> AcceptedFileFormats { get; set; } = new List<string>
+        {
+            ".cs", ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
+            ".hpp", ".xml", ".json", ".yaml", ".yml", ".md", ".txt", ".html", ".css",
+            ".scss", ".sass", ".less", ".sql", ".sh", ".bat", ".ps1", ".rb", ".go",
+            ".rs", ".swift", ".kt", ".php", ".r", ".m", ".mm", ".scala", ".groovy",
+            ".lua", ".dart", ".vue", ".svelte", ".astro", ".ini", ".config", ".conf",
+            ".toml", ".properties", ".env", ".gitignore", ".dockerignore", ".editorconfig",
+            ".csv", ".log", ".diff", ".patch", ".asm", ".pl", ".pm", ".hs", ".clj",
+            ".razor", ".fs", ".vb", ".vbs", ".asmx", ".aspx", ".jsp", ".jspx", ".makefile"
+        };
+
+        /// <summary>
         /// Gets or sets the maximum file size in bytes (default 10MB).
         /// </summary>
         public long MaxFileSizeBytes { get; set; } = 10 * 1024 * 1024;
+
+        /// <summary>
+        /// Gets or sets the maximum file size in KB for UI binding.
+        /// </summary>
+        public double MaxFileSizeKB
+        {
+            get => MaxFileSizeBytes / 1024.0;
+            set => MaxFileSizeBytes = (long)(value * 1024);
+        }
 
         /// <summary>
         /// Gets or sets the list of recent root paths.

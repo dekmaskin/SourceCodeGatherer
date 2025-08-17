@@ -15,8 +15,9 @@ namespace SourceCodeGatherer.Services
         /// </summary>
         /// <param name="rootPath">The root directory path.</param>
         /// <param name="excludedDirectories">Directory patterns to exclude.</param>
+        /// <param name="acceptedFormats">Accepted file formats to filter by.</param>
         /// <returns>Collection of unique file extensions.</returns>
-        Task<IEnumerable<string>> GetFileExtensionsAsync(string rootPath, IEnumerable<string> excludedDirectories = null);
+        Task<IEnumerable<string>> GetFileExtensionsAsync(string rootPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> acceptedFormats = null);
 
         /// <summary>
         /// Exports files with specified extensions to a text file.

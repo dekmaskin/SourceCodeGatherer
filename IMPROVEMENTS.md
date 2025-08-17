@@ -5,18 +5,21 @@ This document outlines all the enhancements implemented to transform the basic s
 ## 🚀 Major Enhancements Implemented
 
 ### 1. **Performance & Scalability**
+
 - **Streaming Export**: Large codebases are now processed using streaming to avoid memory issues
 - **Progress Reporting**: Real-time progress updates with file counts and current file being processed
 - **Async Processing**: All file operations are fully asynchronous for responsive UI
 - **Memory Optimization**: Files are processed one at a time instead of loading everything into memory
 
 ### 2. **Enhanced File Filtering**
+
 - **Directory Exclusion**: Automatically excludes common directories (.git, .vs, .vscode, node_modules, bin, obj, packages, etc.)
 - **File Size Limits**: Configurable maximum file size (default 10MB) to skip huge files
 - **Binary File Detection**: Detects and skips binary files by content analysis, not just extension
 - **Smart Path Filtering**: Filters files based on directory patterns in their path
 
 ### 3. **Configuration & Persistence**
+
 - **Settings Service**: Persistent application settings stored in user's AppData folder
 - **Recent Paths**: Remembers last 10 used directories for quick access
 - **Preferred Extensions**: Automatically selects previously chosen file types
@@ -24,6 +27,7 @@ This document outlines all the enhancements implemented to transform the basic s
 - **Settings UI**: Dedicated settings window with tabbed interface
 
 ### 4. **User Experience Improvements**
+
 - **Drag & Drop**: Drop folders directly onto the application window
 - **Recent Folders Dropdown**: Quick access to recently used directories
 - **Export Statistics**: Shows file count, total size, estimated lines before export
@@ -32,6 +36,7 @@ This document outlines all the enhancements implemented to transform the basic s
 - **Status Messages**: Clear feedback about what the application is doing
 
 ### 5. **Advanced Export Features**
+
 - **Streaming Export**: Memory-efficient export for large codebases
 - **Progress Callbacks**: Real-time progress updates during export
 - **Error Recovery**: Continues processing even if individual files fail
@@ -39,6 +44,7 @@ This document outlines all the enhancements implemented to transform the basic s
 - **File Metadata**: Enhanced output format with better file separation
 
 ### 6. **Architecture Improvements**
+
 - **Dependency Injection**: Clean separation of concerns with service interfaces
 - **MVVM Pattern**: Proper implementation with commands and data binding
 - **Service Layer**: Separate services for file operations and settings
@@ -46,6 +52,7 @@ This document outlines all the enhancements implemented to transform the basic s
 - **Generic Commands**: Support for parameterized commands
 
 ### 7. **Testing Infrastructure**
+
 - **Unit Tests**: Comprehensive test suite for core functionality
 - **Mocking**: Uses Moq for isolated unit testing
 - **Test Coverage**: Tests for file service, view models, and core logic
@@ -54,41 +61,50 @@ This document outlines all the enhancements implemented to transform the basic s
 ## 📁 New Files Added
 
 ### Models
+
 - `AppSettings.cs` - Application configuration and preferences
 - `ExportProgress.cs` - Progress tracking during export operations
 - `ExportStatistics.cs` - Statistics about export operations
 
 ### Services
+
 - `ISettingsService.cs` - Interface for settings persistence
 - `SettingsService.cs` - JSON-based settings storage implementation
 
 ### Views
+
 - `SettingsWindow.xaml` - Settings configuration UI
 - `SettingsWindow.xaml.cs` - Settings window code-behind
 
 ### ViewModels
+
 - `SettingsViewModel.cs` - ViewModel for settings window
 
 ### Commands
+
 - `RelayCommand<T>.cs` - Generic command implementation
 
 ### Tests
+
 - `FileServiceTests.cs` - Unit tests for file operations
 - `MainViewModelTests.cs` - Unit tests for main view model
 - `SourceCodeGatherer.Tests.csproj` - Test project configuration
 
 ### Solution
+
 - `SourceCodeGatherer.sln` - Visual Studio solution file
 
 ## 🔧 Enhanced Features
 
 ### Original Features (Improved)
+
 - **Directory Scanning**: Now with exclusion patterns and better performance
 - **File Type Detection**: Enhanced with 40+ file types and binary detection
 - **Export Options**: Both file and clipboard export with progress tracking
 - **UI Responsiveness**: Fully async operations with progress feedback
 
 ### New Features
+
 - **Settings Management**: Persistent configuration with UI
 - **Recent Paths**: Quick access to frequently used directories
 - **Export Statistics**: Preview of what will be exported

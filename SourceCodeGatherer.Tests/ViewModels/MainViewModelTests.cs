@@ -91,14 +91,14 @@ namespace SourceCodeGatherer.Tests.ViewModels
         {
             // Arrange
             var expectedExtensions = new[] { ".cs", ".js" };
-            _mockFileService.Setup(s => s.GetFileExtensionsAsync(It.IsAny<string>(), It.IsAny<IEnumerable<string>>()))
+            _mockFileService.Setup(s => s.GetFileExtensionsAsync(It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<string>>()))
                 .ReturnsAsync(expectedExtensions);
 
             // Act
             var result = await _mockFileService.Object.GetFileExtensionsAsync(@"C:\Test");
 
             // Assert
-            _mockFileService.Verify(s => s.GetFileExtensionsAsync(@"C:\Test", It.IsAny<IEnumerable<string>>()), Times.Once);
+            _mockFileService.Verify(s => s.GetFileExtensionsAsync(@"C:\Test", It.IsAny<IEnumerable<string>>(), It.IsAny<IEnumerable<string>>()), Times.Once);
             Assert.Equal(expectedExtensions, result);
         }
     }

@@ -15,7 +15,7 @@ namespace SourceCodeGatherer.ViewModels
         private readonly ISettingsService _settingsService;
         private readonly AppSettings _originalSettings;
         private string _excludedDirectoriesText;
-        private double _maxFileSizeMB;
+        private string _acceptedFileFormatsText;
         private bool _useStreaming;
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace SourceCodeGatherer.ViewModels
 
             // Initialize properties from current settings
             ExcludedDirectoriesText = string.Join(Environment.NewLine, _originalSettings.ExcludedDirectories);
-            MaxFileSizeMB = _originalSettings.MaxFileSizeBytes / (1024.0 * 1024.0);
+            AcceptedFileFormatsText = string.Join(Environment.NewLine, _originalSettings.AcceptedFileFormats);
             UseStreaming = _originalSettings.UseStreaming;
 
             SaveCommand = new RelayCommand(ExecuteSave);
@@ -48,13 +48,15 @@ namespace SourceCodeGatherer.ViewModels
         }
 
         /// <summary>
-        /// Gets or sets the maximum file size in MB.
+        /// Gets or sets the accepted file formats text.
         /// </summary>
-        public double MaxFileSizeMB
+        public string AcceptedFileFormatsText
         {
-            get => _maxFileSizeMB;
-            set => SetProperty(ref _maxFileSizeMB, Math.Max(0.1, value));
+            get => _acceptedFileFormatsText;
+            set => SetProperty(ref _acceptedFileFormatsText, value);
         }
+
+
 
         /// <summary>
         /// Gets or sets whether to use streaming.
@@ -89,7 +91,12 @@ namespace SourceCodeGatherer.ViewModels
                     .Where(s => !string.IsNullOrWhiteSpace(s))
                     .ToList();
 
-                _originalSettings.MaxFileSizeBytes = (long)(MaxFileSizeMB * 1024 * 1024);
+                _originalSettings.AcceptedFileFormats = AcceptedFileFormatsText
+                    .Split(new[] { Environment.NewLine, "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+
                 _originalSettings.UseStreaming = UseStreaming;
 
                 await _settingsService.SaveSettingsAsync(_originalSettings);
