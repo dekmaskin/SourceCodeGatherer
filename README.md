@@ -1,114 +1,133 @@
 # Source Code Gatherer
 
-A professional Windows desktop application for collecting and exporting source code files from directory structures. Perfect for creating context files for AI models, code reviews, or documentation purposes.
+Easily collect and share your code files in one organized document. Perfect for sharing your project with AI assistants, conducting code reviews, or creating documentation.
 
-![.NET](https://img.shields.io/badge/.NET-8.0+-512BD4?style=flat-square&logo=dotnet)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-## 🚀 Features
-- **Automatic Directory Scanning**: Instantly scans directories when selected
-- **Smart File Type Detection**: Automatically identifies 40+ source code file types
-- **Selective Export**: Choose exactly which file types to include
-- **Multiple Export Options**:
-  - Export to file with customizable location
-  - Export directly to clipboard for quick sharing
-- **Detailed Output Format**: Each file includes their relative location
+## ✨ What It Does
 
-## 📋 Prerequisites
+Source Code Gatherer takes all your project files and combines them into a single, well-organized document. Whether you're working with ChatGPT, Claude, or other AI tools, this makes it easy to share your entire codebase for analysis, debugging, or enhancement suggestions.
 
-- Windows 10 or later
-- [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/6.0) or later
+<img src="SourceCodeGatherer/docs/images/MainWindow.png" alt="Screenshot" width="70%"/>
 
-## 🛠️ Installation
+## 🎯 Perfect For
 
-### Option 1: Build from Source
+- **AI Assistance**: Share your complete project with AI tools for better help and suggestions
+- **Code Reviews**: Send your entire codebase to colleagues in one clean document
+- **Documentation**: Create comprehensive project snapshots for reference
+- **Backup & Archive**: Keep organized copies of your project's source code
+- **Learning**: Study how projects are structured by examining complete codebases
 
-1. Clone the repository:
-```bash
-git clone https://github.com/dekmaskin/SourceCodeGatherer.git
-cd source-code-gatherer
+## 🚀 Key Features
+
+- **One-Click Collection**: Simply select your project folder and let the app do the work
+- **Smart File Detection**: Automatically finds all your code files (40+ file types supported)
+- **Choose What to Include**: Pick exactly which file types you want in your export
+- **Two Export Options**:
+  - Save to a file on your computer
+  - Copy directly to clipboard for instant sharing
+- **Works with Large Projects**: Handles big codebases efficiently with progress tracking
+- **Remembers Your Preferences**: Saves your settings for each project you work on
+- **Clean, Organized Output**: Each file is clearly labeled with its location in your project
+
+## 💻 System Requirements
+
+- Windows 10 or newer
+- [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (free download from Microsoft)
+
+## 📥 Getting Started
+
+**Easy Installation:**
+1. Download the latest version from our [Releases page](https://github.com/dekmaskin/SourceCodeGatherer/releases)
+2. Extract the zip file to a folder of your choice
+3. Run `SourceCodeGatherer.exe`
+
+That's it! No complex setup required.
+
+## 🎮 How to Use
+
+**It's as simple as 1-2-3:**
+
+1. **Pick Your Project Folder**
+   - Click "Browse" and select your project directory
+   - Or simply drag and drop your folder into the app
+   - The app instantly finds all your code files
+
+2. **Choose What to Include**
+   - See all the file types in your project
+   - Check the boxes for the files you want to include
+   - Common types like .js, .py, .cs, .html are automatically detected
+
+3. **Get Your Code**
+   - **Save to File**: Creates a document you can save anywhere
+   - **Copy to Clipboard**: Instantly ready to paste into ChatGPT, emails, or anywhere else
+
+**Pro Tip**: The app remembers your preferences for each project, so next time you open the same folder, your settings are already there!
+
+## 🧠 Smart Memory
+
+The app learns from how you work:
+
+- **Remembers Your Projects**: Each project folder keeps its own settings
+- **Saves Your Preferences**: File types, window size, and export locations are remembered
+- **Quick Access**: Recent projects appear in a dropdown for easy switching
+- **No Setup Hassle**: Switch between projects without reconfiguring everything
+
+## 🛠️ Need Help?
+
+If something isn't working right:
+
+- Check that you have the .NET 8.0 Runtime installed
+- Make sure you have permission to read the folders you're trying to scan
+- The app keeps helpful logs in your user folder if you need to troubleshoot
+- Feel free to open an issue on our GitHub page
+
+## 📄 What You Get
+
+Your exported code is organized in a clean, readable format:
+
 ```
+=== FILE: src/components/Header.js ===
 
-2. Build the project:
-```bash
-dotnet build -c Release
-```
-
-3. Run the application:
-```bash
-dotnet run -c Release
-```
-
-### Option 2: Download Release
-
-Download the latest release from the [Releases](https://github.com/dekmaskin/SourceCodeGatherer/releases) page.
-
-## 📖 Usage
-
-1. **Select Source Directory**
-   - Click "Browse..." next to Root Path
-   - Choose the directory containing your source code
-   - The application automatically scans for file types
-
-2. **Choose File Types**
-   - Check the file extensions you want to include
-   - Only text-based source files are shown (no binaries)
-
-3. **Export Your Code**
-   - **Export to File**: Saves to your Downloads folder by default (customizable)
-   - **Export to Clipboard**: Instantly copies all code to clipboard
-
-## 📁 Output Format
-
-The exported file contains all selected source files in a structured format:
-
-```
-=== FILE: src/models/User.cs ===
-
-[File contents here]
+[Your actual file contents appear here]
 
 === END OF FILE ===
 ```
 
-## 🔧 Supported File Types
+Each file is clearly labeled with its location in your project, making it easy to understand the structure.
 
-The application recognizes 40+ file extensions including:
+## 🌐 Supported Languages
 
-**Languages**: `.cs`, `.py`, `.js`, `.ts`, `.java`, `.cpp`, `.go`, `.rs`, `.swift`, `.php`, `.rb`
+Works with 40+ programming languages and file types:
 
-**Web**: `.html`, `.css`, `.scss`, `.jsx`, `.tsx`, `.vue`, `.svelte`
+**Popular Languages**: JavaScript, Python, C#, Java, C++, Go, Rust, Swift, PHP, Ruby
 
-**Data**: `.json`, `.xml`, `.yaml`, `.toml`
+**Web Development**: HTML, CSS, React (JSX), TypeScript, Vue, Svelte
 
-**Config**: `.config`, `.ini`, `.env`, `.gitignore`
+**Configuration Files**: JSON, XML, YAML, environment files, config files
 
-**Scripts**: `.sh`, `.bat`, `.ps1`
+**Scripts & More**: Shell scripts, batch files, PowerShell, and many others
 
-And many more...
+Don't see your language? The app automatically detects text-based files, so it likely works with your code too!
 
-## 🤝 Contributing
+## 💡 Common Use Cases
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+**Working with AI Tools:**
+- Share your entire project with ChatGPT, Claude, or other AI assistants
+- Get better suggestions when the AI can see your complete codebase
+- Debug issues by providing full context
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## 📞 Questions or Issues?
+
+- Check out our [Issues page](https://github.com/dekmaskin/SourceCodeGatherer/issues) for common questions
+- Report bugs or request features
+- Make sure you have the .NET 8.0 Runtime installed
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-- Open an [Issue](https://github.com/yourusername/SourceCodeGatherer/issues)
-- Check existing issues for solutions
-- Ensure you have the latest .NET runtime installed
+Free to use under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
 
 ---
 
-**Made with ❤️ for developers who work with AI**
+**Built for developers who want to work smarter with AI tools** ✨

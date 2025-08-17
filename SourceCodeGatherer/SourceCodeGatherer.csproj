@@ -11,8 +11,8 @@
 		<Company>Dekmaskin</Company>
 		<Product>Source Code Gatherer</Product>
 		<Description>A tool to gather source code files for AI context</Description>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.0.0</AssemblyVersion>
 
 		<PublishAot>false</PublishAot>
 		<SelfContained>false</SelfContained>
@@ -20,5 +20,15 @@
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<PublishSingleFile>false</PublishSingleFile>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+		<PackageReference Include="Serilog" Version="3.1.1" />
+		<PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+		<PackageReference Include="Serilog.Formatting.Compact" Version="2.0.0" />
+	</ItemGroup>
 
 </Project>

@@ -4,8 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Source Code Gatherer" Height="600" Width="800"
-        WindowStartupLocation="CenterScreen">
+        Title="Source Code Gatherer" Height="650" Width="800"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Padding" Value="10,5"/>
@@ -21,48 +24,133 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <DockPanel>
+        <!-- Menu Bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Usage Guide" Command="{Binding HelpCommand}"/>
+                <Separator/>
+                <MenuItem Header="_About" Command="{Binding AboutCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
         <!-- Root Directory Selection -->
         <GroupBox Grid.Row="0" Header="Source Directory" Margin="0,0,0,10">
             <Grid Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Path Selection -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <Label Grid.Column="0" Content="Root Path:"/>
-                <TextBox Grid.Column="1" Name="txtRootPath" Margin="5,0"
-                         Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"/>
-                <Button Grid.Column="2" Content="Browse..." 
-                        Command="{Binding BrowseRootCommand}"/>
+                    <Label Grid.Column="0" Content="Root Path:"/>
+                    <TextBox Grid.Column="1" Name="txtRootPath" Margin="5,0"
+                             Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Column="2" Content="Browse..." 
+                            Command="{Binding BrowseRootCommand}"/>
+                </Grid>
+                
+                <!-- Recent Paths -->
+                <Grid Grid.Row="1" Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Recent:"/>
+                    <ComboBox Grid.Column="1" Margin="5,0,0,0" Name="RecentPathsComboBox"
+                              ItemsSource="{Binding RecentPaths}"
+                              SelectionChanged="RecentPathsComboBox_SelectionChanged">
+                    </ComboBox>
+                </Grid>
+
+                <!-- Max File Size -->
+                <Grid Grid.Row="2" Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Label Grid.Row="0" Content="Maximum File Size:" FontWeight="Bold"/>
+                    
+                    <!-- Slider -->
+                    <Grid Grid.Row="1" Margin="0,5,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="0 KB" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" Name="sldMaxFileSize" 
+                                Minimum="0" Maximum="10240" 
+                                Value="{Binding MaxFileSizeKB, UpdateSourceTrigger=PropertyChanged}"
+                                TickFrequency="1024" TickPlacement="BottomRight"
+                                Margin="10,0"/>
+                        <TextBlock Grid.Column="2" Text="10 MB" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Current Value and Manual Input -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="Current: " FontWeight="Bold"/>
+                            <TextBlock Text="{Binding MaxFileSizeKB, StringFormat={}{0:F0} KB}" FontWeight="Bold"/>
+                            <TextBlock Text=" (" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding MaxFileSizeMB, StringFormat={}{0:F2} MB}" FontWeight="Bold"/>
+                            <TextBlock Text=")" FontWeight="Bold"/>
+                        </StackPanel>
+
+                        <Label Grid.Column="1" Content="Enter KB:" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="2" Name="txtMaxFileSizeKB" 
+                                 Text="{Binding MaxFileSizeKB, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:F0}}"
+                                 VerticalAlignment="Center" Margin="5,0"/>
+                        <TextBlock Grid.Column="3" Text="KB" VerticalAlignment="Center" Margin="5,0"/>
+                    </Grid>
+                </Grid>
             </Grid>
         </GroupBox>
 
         <!-- File Extensions List -->
-        <GroupBox Grid.Row="1" Header="File Types" Margin="0,0,0,10" 
-                  Grid.RowSpan="2">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+        <GroupBox Grid.Row="1" Header="File Types" Margin="0,0,0,10">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="Select file types to include:" 
-                               Margin="0,0,0,10"
-                               Visibility="{Binding FileTypesVisibility}"/>
+                <TextBlock Grid.Row="0" Text="Select file types to include:" 
+                           Margin="0,0,0,10"
+                           Visibility="{Binding FileTypesVisibility}"/>
 
-                    <ItemsControl Grid.Row="1" ItemsSource="{Binding FileExtensions}">
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding FileExtensions}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Horizontal"/>
@@ -76,8 +164,53 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </GroupBox>
+
+        <!-- Export Statistics -->
+        <GroupBox Grid.Row="2" Header="Export Preview" Margin="0,0,0,10"
+                  Visibility="{Binding StatisticsVisibility}">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Statistics -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <TextBlock Text="Files" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.TotalFiles}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkBlue"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock Text="Total Size" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.FormattedSize}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkGreen"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <TextBlock Text="Est. Lines" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.EstimatedLines}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkOrange"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                        <Button Content="Manage Files" 
+                            Command="{Binding ManageFilesCommand}"
+                            IsEnabled="{Binding CanManageFiles}"
+                            ToolTip="Select which files to include and exclude content"
+                            HorizontalAlignment="Center"
+                            MinWidth="120"/>
+                    </StackPanel>
                 </Grid>
-            </ScrollViewer>
+            </Grid>
         </GroupBox>
 
         <!-- Output File Selection -->
@@ -98,9 +231,18 @@
         </GroupBox>
 
         <!-- Progress Bar -->
-        <ProgressBar Grid.Row="4" Height="20" Margin="0,0,0,10"
-                     IsIndeterminate="{Binding IsProcessing}"
-                     Visibility="{Binding ProgressVisibility}"/>
+        <Grid Grid.Row="4" Margin="0,0,0,10" Visibility="{Binding ProgressVisibility}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock Grid.Row="0" Text="{Binding ProgressText}" 
+                       Margin="0,0,0,5" FontSize="11"/>
+            <ProgressBar Grid.Row="1" Height="20"
+                         Value="{Binding ProgressValue}"
+                         Maximum="100"/>
+        </Grid>
 
         <!-- Action Buttons -->
         <Grid Grid.Row="5">
@@ -109,18 +251,22 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" 
                        VerticalAlignment="Center" Foreground="Green"/>
-            <Button Grid.Column="1" Content="Export to Clipboard" 
+            <Button Grid.Column="1" Content="Settings" 
+                    Command="{Binding SettingsCommand}"/>
+            <Button Grid.Column="2" Content="Export to Clipboard" 
                     Command="{Binding ExportToClipboardCommand}"
                     IsEnabled="{Binding CanExport}"/>
-            <Button Grid.Column="2" Content="Export to File" 
+            <Button Grid.Column="3" Content="Export to File" 
                     Command="{Binding ExportCommand}"
                     IsEnabled="{Binding CanExport}"/>
-            <Button Grid.Column="3" Content="Close" 
+            <Button Grid.Column="4" Content="Close" 
                     Click="CloseButton_Click"/>
         </Grid>
     </Grid>
+    </DockPanel>
 </Window>
