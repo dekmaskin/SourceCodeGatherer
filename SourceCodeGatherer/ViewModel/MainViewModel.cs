@@ -216,6 +216,9 @@ namespace SourceCodeGatherer.ViewModels
                         OnPropertyChanged();
                         OnPropertyChanged(nameof(MaxFileSizeMB));
                         _ = SaveSettingsAsync();
+                        
+                        // Update statistics when file size limit changes
+                        _ = UpdateStatisticsAsync();
                     }
                 }
             }
@@ -239,7 +242,7 @@ namespace SourceCodeGatherer.ViewModels
         public ICommand ExportCommand { get; private set; }
         public ICommand ExportToClipboardCommand { get; private set; }
         public ICommand SelectRecentPathCommand { get; private set; }
-        public ICommand RefreshStatisticsCommand { get; private set; }
+
         public ICommand SettingsCommand { get; private set; }
         public ICommand HelpCommand { get; private set; }
         public ICommand AboutCommand { get; private set; }
@@ -255,7 +258,7 @@ namespace SourceCodeGatherer.ViewModels
             ExportCommand = new RelayCommand(ExecuteExport, CanExecuteExport);
             ExportToClipboardCommand = new RelayCommand(ExecuteExportToClipboard, CanExecuteExport);
             SelectRecentPathCommand = new RelayCommand<string>(ExecuteSelectRecentPath);
-            RefreshStatisticsCommand = new RelayCommand(ExecuteRefreshStatistics, CanExecuteExport);
+
             SettingsCommand = new RelayCommand(ExecuteSettings);
             HelpCommand = new RelayCommand(ExecuteHelp);
             AboutCommand = new RelayCommand(ExecuteAbout);
@@ -619,10 +622,7 @@ namespace SourceCodeGatherer.ViewModels
             }
         }
 
-        private async void ExecuteRefreshStatistics()
-        {
-            await UpdateStatisticsAsync();
-        }
+
 
         private void ExecuteSettings()
         {
