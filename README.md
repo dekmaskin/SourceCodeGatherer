@@ -9,6 +9,8 @@ Easily collect and share your code files in one organized document. Perfect for 
 
 Source Code Gatherer takes all your project files and combines them into a single, well-organized document. Whether you're working with ChatGPT, Claude, or other AI tools, this makes it easy to share your entire codebase for analysis, debugging, or enhancement suggestions.
 
+![Main window](docs/images/MainWindow.png)
+
 ## 🎯 Perfect For
 
 - **AI Assistance**: Share your complete project with AI tools for better help and suggestions
