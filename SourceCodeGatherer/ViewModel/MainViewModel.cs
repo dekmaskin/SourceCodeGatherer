@@ -18,17 +18,23 @@ namespace SourceCodeGatherer.ViewModels
     public class MainViewModel : BaseViewModel
     {
         private readonly IFileService _fileService;
+        private readonly ISettingsService _settingsService;
+        private AppSettings _settings;
         private string _rootPath;
         private string _outputPath;
         private bool _isProcessing;
         private string _statusMessage;
+        private int _progressValue;
+        private string _progressText = string.Empty;
         private Visibility _progressVisibility = Visibility.Collapsed;
         private Visibility _fileTypesVisibility = Visibility.Collapsed;
+        private Visibility _statisticsVisibility = Visibility.Collapsed;
+        private ExportStatistics _exportStatistics;
 
         /// <summary>
         /// Initializes a new instance of the MainViewModel class.
         /// </summary>
-        public MainViewModel() : this(new FileService())
+        public MainViewModel() : this(new FileService(), new SettingsService())
         {
         }
 
@@ -36,13 +42,16 @@ namespace SourceCodeGatherer.ViewModels
         /// Initializes a new instance of the MainViewModel class with dependency injection.
         /// </summary>
         /// <param name="fileService">The file service.</param>
-        public MainViewModel(IFileService fileService)
+        /// <param name="settingsService">The settings service.</param>
+        public MainViewModel(IFileService fileService, ISettingsService settingsService)
         {
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
+            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
             FileExtensions = new ObservableCollection<FileExtensionItem>();
+            RecentPaths = new ObservableCollection<string>();
             InitializeCommands();
-            StatusMessage = "Select a root directory to begin.";
+            _ = LoadSettingsAsync();
         }
 
         #region Properties
@@ -111,6 +120,24 @@ namespace SourceCodeGatherer.ViewModels
         }
 
         /// <summary>
+        /// Gets or sets the progress value (0-100).
+        /// </summary>
+        public int ProgressValue
+        {
+            get => _progressValue;
+            set => SetProperty(ref _progressValue, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the progress text.
+        /// </summary>
+        public string ProgressText
+        {
+            get => _progressText;
+            set => SetProperty(ref _progressText, value);
+        }
+
+        /// <summary>
         /// Gets or sets the visibility of the progress bar.
         /// </summary>
         public Visibility ProgressVisibility
@@ -126,6 +153,24 @@ namespace SourceCodeGatherer.ViewModels
         {
             get => _fileTypesVisibility;
             set => SetProperty(ref _fileTypesVisibility, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the visibility of the statistics panel.
+        /// </summary>
+        public Visibility StatisticsVisibility
+        {
+            get => _statisticsVisibility;
+            set => SetProperty(ref _statisticsVisibility, value);
+        }
+
+        /// <summary>
+        /// Gets or sets the export statistics.
+        /// </summary>
+        public ExportStatistics ExportStatistics
+        {
+            get => _exportStatistics;
+            set => SetProperty(ref _exportStatistics, value);
         }
 
         /// <summary>
@@ -149,6 +194,11 @@ namespace SourceCodeGatherer.ViewModels
         /// </summary>
         public ObservableCollection<FileExtensionItem> FileExtensions { get; }
 
+        /// <summary>
+        /// Gets the collection of recent paths.
+        /// </summary>
+        public ObservableCollection<string> RecentPaths { get; }
+
         #endregion
 
         #region Commands
@@ -157,6 +207,9 @@ namespace SourceCodeGatherer.ViewModels
         public ICommand BrowseOutputCommand { get; private set; }
         public ICommand ExportCommand { get; private set; }
         public ICommand ExportToClipboardCommand { get; private set; }
+        public ICommand SelectRecentPathCommand { get; private set; }
+        public ICommand RefreshStatisticsCommand { get; private set; }
+        public ICommand SettingsCommand { get; private set; }
 
         #endregion
 
@@ -168,6 +221,46 @@ namespace SourceCodeGatherer.ViewModels
             BrowseOutputCommand = new RelayCommand(ExecuteBrowseOutput);
             ExportCommand = new RelayCommand(ExecuteExport, CanExecuteExport);
             ExportToClipboardCommand = new RelayCommand(ExecuteExportToClipboard, CanExecuteExport);
+            SelectRecentPathCommand = new RelayCommand<string>(ExecuteSelectRecentPath);
+            RefreshStatisticsCommand = new RelayCommand(ExecuteRefreshStatistics, CanExecuteExport);
+            SettingsCommand = new RelayCommand(ExecuteSettings);
+        }
+
+        private async Task LoadSettingsAsync()
+        {
+            try
+            {
+                _settings = await _settingsService.LoadSettingsAsync();
+                
+                // Load recent paths
+                RecentPaths.Clear();
+                foreach (var path in _settings.RecentPaths.Where(Directory.Exists))
+                {
+                    RecentPaths.Add(path);
+                }
+
+                // Restore last paths if they exist
+                if (!string.IsNullOrWhiteSpace(_settings.LastRootPath) && Directory.Exists(_settings.LastRootPath))
+                {
+                    RootPath = _settings.LastRootPath;
+                }
+
+                if (!string.IsNullOrWhiteSpace(_settings.LastOutputPath))
+                {
+                    var directory = Path.GetDirectoryName(_settings.LastOutputPath);
+                    if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                    {
+                        OutputPath = _settings.LastOutputPath;
+                    }
+                }
+
+                StatusMessage = "Ready. Select a root directory to begin.";
+            }
+            catch
+            {
+                _settings = new AppSettings();
+                StatusMessage = "Select a root directory to begin.";
+            }
         }
 
         private void UpdateStatusMessage()
@@ -233,17 +326,26 @@ namespace SourceCodeGatherer.ViewModels
             IsProcessing = true;
             FileExtensions.Clear();
             FileTypesVisibility = Visibility.Collapsed;
+            StatisticsVisibility = Visibility.Collapsed;
             StatusMessage = "Scanning directory...";
+            ProgressText = "Scanning for file types...";
 
             try
             {
-                var extensions = await _fileService.GetFileExtensionsAsync(RootPath);
+                var extensions = await _fileService.GetFileExtensionsAsync(RootPath, _settings?.ExcludedDirectories);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     foreach (var ext in extensions)
                     {
                         var item = new FileExtensionItem { Extension = ext };
+                        
+                        // Auto-select preferred extensions
+                        if (_settings?.PreferredExtensions?.Contains(ext) == true)
+                        {
+                            item.IsChecked = true;
+                        }
+                        
                         item.PropertyChanged += OnFileExtensionItemPropertyChanged;
                         FileExtensions.Add(item);
                     }
@@ -252,6 +354,12 @@ namespace SourceCodeGatherer.ViewModels
                     {
                         FileTypesVisibility = Visibility.Visible;
                         StatusMessage = $"Found {FileExtensions.Count} file types. Select the ones to include.";
+                        
+                        // Update statistics if any extensions are selected
+                        if (FileExtensions.Any(x => x.IsChecked))
+                        {
+                            _ = UpdateStatisticsAsync();
+                        }
                     }
                     else
                     {
@@ -260,6 +368,25 @@ namespace SourceCodeGatherer.ViewModels
 
                     OnPropertyChanged(nameof(CanExport));
                 });
+
+                // Save to recent paths
+                if (_settingsService != null)
+                {
+                    await _settingsService.AddRecentPathAsync(RootPath);
+                    
+                    // Update recent paths in UI
+                    if (!RecentPaths.Contains(RootPath))
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            RecentPaths.Insert(0, RootPath);
+                            if (RecentPaths.Count > 10)
+                            {
+                                RecentPaths.RemoveAt(RecentPaths.Count - 1);
+                            }
+                        });
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -272,6 +399,7 @@ namespace SourceCodeGatherer.ViewModels
             finally
             {
                 IsProcessing = false;
+                ProgressText = string.Empty;
             }
         }
 
@@ -281,6 +409,58 @@ namespace SourceCodeGatherer.ViewModels
             {
                 OnPropertyChanged(nameof(CanExport));
                 CommandManager.InvalidateRequerySuggested();
+                
+                // Update statistics when selection changes
+                _ = UpdateStatisticsAsync();
+                
+                // Save preferred extensions
+                _ = SavePreferredExtensionsAsync();
+            }
+        }
+
+        private async Task SavePreferredExtensionsAsync()
+        {
+            if (_settings != null && _settingsService != null)
+            {
+                _settings.PreferredExtensions = FileExtensions
+                    .Where(x => x.IsChecked)
+                    .Select(x => x.Extension)
+                    .ToList();
+                
+                await _settingsService.SaveSettingsAsync(_settings);
+            }
+        }
+
+        private async Task UpdateStatisticsAsync()
+        {
+            if (!CanExport) 
+            {
+                StatisticsVisibility = Visibility.Collapsed;
+                return;
+            }
+
+            try
+            {
+                var selectedExtensions = FileExtensions
+                    .Where(x => x.IsChecked)
+                    .Select(x => x.Extension)
+                    .ToList();
+
+                if (selectedExtensions.Any())
+                {
+                    var stats = await _fileService.GetExportStatisticsAsync(RootPath, selectedExtensions, _settings);
+                    
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ExportStatistics = stats;
+                        StatisticsVisibility = Visibility.Visible;
+                    });
+                }
+            }
+            catch
+            {
+                // Silently fail statistics update
+                StatisticsVisibility = Visibility.Collapsed;
             }
         }
 
@@ -293,6 +473,7 @@ namespace SourceCodeGatherer.ViewModels
         {
             IsProcessing = true;
             StatusMessage = "Exporting files...";
+            ProgressValue = 0;
 
             try
             {
@@ -301,10 +482,32 @@ namespace SourceCodeGatherer.ViewModels
                     .Select(x => x.Extension)
                     .ToList();
 
-                await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions);
+                var progress = new Progress<ExportProgress>(p =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ProgressValue = p.PercentComplete;
+                        ProgressText = $"Processing: {Path.GetFileName(p.CurrentFile)} ({p.FilesProcessed}/{p.TotalFiles})";
+                        
+                        if (!string.IsNullOrEmpty(p.ErrorMessage))
+                        {
+                            StatusMessage = p.ErrorMessage;
+                        }
+                    });
+                });
+
+                await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions, _settings, progress);
+
+                // Save settings
+                if (_settings != null && _settingsService != null)
+                {
+                    _settings.LastRootPath = RootPath;
+                    _settings.LastOutputPath = OutputPath;
+                    await _settingsService.SaveSettingsAsync(_settings);
+                }
 
                 StatusMessage = "Export completed successfully!";
-                ShowSuccess("Export completed successfully!");
+                ShowSuccess($"Export completed successfully!\nFile saved to: {OutputPath}");
             }
             catch (Exception ex)
             {
@@ -314,6 +517,8 @@ namespace SourceCodeGatherer.ViewModels
             finally
             {
                 IsProcessing = false;
+                ProgressValue = 0;
+                ProgressText = string.Empty;
             }
         }
 
@@ -321,6 +526,7 @@ namespace SourceCodeGatherer.ViewModels
         {
             IsProcessing = true;
             StatusMessage = "Exporting to clipboard...";
+            ProgressValue = 0;
 
             try
             {
@@ -329,7 +535,21 @@ namespace SourceCodeGatherer.ViewModels
                     .Select(x => x.Extension)
                     .ToList();
 
-                var content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions);
+                var progress = new Progress<ExportProgress>(p =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        ProgressValue = p.PercentComplete;
+                        ProgressText = $"Processing: {Path.GetFileName(p.CurrentFile)} ({p.FilesProcessed}/{p.TotalFiles})";
+                        
+                        if (!string.IsNullOrEmpty(p.ErrorMessage))
+                        {
+                            StatusMessage = p.ErrorMessage;
+                        }
+                    });
+                });
+
+                var content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions, _settings, progress);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -347,6 +567,39 @@ namespace SourceCodeGatherer.ViewModels
             finally
             {
                 IsProcessing = false;
+                ProgressValue = 0;
+                ProgressText = string.Empty;
+            }
+        }
+
+        private void ExecuteSelectRecentPath(string path)
+        {
+            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            {
+                RootPath = path;
+            }
+        }
+
+        private async void ExecuteRefreshStatistics()
+        {
+            await UpdateStatisticsAsync();
+        }
+
+        private void ExecuteSettings()
+        {
+            var settingsViewModel = new SettingsViewModel(_settingsService, _settings);
+            var settingsWindow = new Views.SettingsWindow(settingsViewModel)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (settingsWindow.ShowDialog() == true)
+            {
+                // Settings were saved, refresh statistics if applicable
+                if (CanExport)
+                {
+                    _ = UpdateStatisticsAsync();
+                }
             }
         }
 

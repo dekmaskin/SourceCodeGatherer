@@ -4,8 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Source Code Gatherer" Height="600" Width="800"
-        WindowStartupLocation="CenterScreen">
+        Title="Source Code Gatherer" Height="650" Width="800"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Padding" Value="10,5"/>
@@ -34,35 +37,58 @@
         <!-- Root Directory Selection -->
         <GroupBox Grid.Row="0" Header="Source Directory" Margin="0,0,0,10">
             <Grid Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Path Selection -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <Label Grid.Column="0" Content="Root Path:"/>
-                <TextBox Grid.Column="1" Name="txtRootPath" Margin="5,0"
-                         Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"/>
-                <Button Grid.Column="2" Content="Browse..." 
-                        Command="{Binding BrowseRootCommand}"/>
+                    <Label Grid.Column="0" Content="Root Path:"/>
+                    <TextBox Grid.Column="1" Name="txtRootPath" Margin="5,0"
+                             Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Column="2" Content="Browse..." 
+                            Command="{Binding BrowseRootCommand}"/>
+                </Grid>
+                
+                <!-- Recent Paths -->
+                <Grid Grid.Row="1" Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Recent:"/>
+                    <ComboBox Grid.Column="1" Margin="5,0,0,0" Name="RecentPathsComboBox"
+                              ItemsSource="{Binding RecentPaths}"
+                              SelectionChanged="RecentPathsComboBox_SelectionChanged">
+                    </ComboBox>
+                </Grid>
             </Grid>
         </GroupBox>
 
         <!-- File Extensions List -->
         <GroupBox Grid.Row="1" Header="File Types" Margin="0,0,0,10" 
                   Grid.RowSpan="2">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="Select file types to include:" 
-                               Margin="0,0,0,10"
-                               Visibility="{Binding FileTypesVisibility}"/>
+                <TextBlock Grid.Row="0" Text="Select file types to include:" 
+                           Margin="0,0,0,10"
+                           Visibility="{Binding FileTypesVisibility}"/>
 
-                    <ItemsControl Grid.Row="1" ItemsSource="{Binding FileExtensions}">
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding FileExtensions}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Horizontal"/>
@@ -76,8 +102,40 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </Grid>
-            </ScrollViewer>
+                </ScrollViewer>
+                
+                <!-- Statistics Panel -->
+                <Border Grid.Row="2" Background="LightGray" Padding="10" Margin="0,10,0,0"
+                        Visibility="{Binding StatisticsVisibility}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Files:" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding ExportStatistics.TotalFiles}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Size:" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding ExportStatistics.FormattedSize}"/>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Est. Lines:" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding ExportStatistics.EstimatedLines}"/>
+                        </StackPanel>
+                        
+                        <Button Grid.Column="3" Content="Refresh" 
+                                Command="{Binding RefreshStatisticsCommand}"
+                                Padding="5,2" Margin="5,0,0,0"/>
+                    </Grid>
+                </Border>
+            </Grid>
         </GroupBox>
 
         <!-- Output File Selection -->
@@ -98,9 +156,18 @@
         </GroupBox>
 
         <!-- Progress Bar -->
-        <ProgressBar Grid.Row="4" Height="20" Margin="0,0,0,10"
-                     IsIndeterminate="{Binding IsProcessing}"
-                     Visibility="{Binding ProgressVisibility}"/>
+        <Grid Grid.Row="4" Margin="0,0,0,10" Visibility="{Binding ProgressVisibility}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <TextBlock Grid.Row="0" Text="{Binding ProgressText}" 
+                       Margin="0,0,0,5" FontSize="11"/>
+            <ProgressBar Grid.Row="1" Height="20"
+                         Value="{Binding ProgressValue}"
+                         Maximum="100"/>
+        </Grid>
 
         <!-- Action Buttons -->
         <Grid Grid.Row="5">
@@ -109,17 +176,21 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" 
                        VerticalAlignment="Center" Foreground="Green"/>
-            <Button Grid.Column="1" Content="Export to Clipboard" 
+            <Button Grid.Column="1" Content="Settings" 
+                    Command="{Binding SettingsCommand}"/>
+            <Button Grid.Column="2" Content="Export to Clipboard" 
                     Command="{Binding ExportToClipboardCommand}"
                     IsEnabled="{Binding CanExport}"/>
-            <Button Grid.Column="2" Content="Export to File" 
+            <Button Grid.Column="3" Content="Export to File" 
                     Command="{Binding ExportCommand}"
                     IsEnabled="{Binding CanExport}"/>
-            <Button Grid.Column="3" Content="Close" 
+            <Button Grid.Column="4" Content="Close" 
                     Click="CloseButton_Click"/>
         </Grid>
     </Grid>

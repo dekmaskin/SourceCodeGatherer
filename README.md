@@ -13,6 +13,20 @@ A professional Windows desktop application for collecting and exporting source c
 - **Multiple Export Options**:
   - Export to file with customizable location
   - Export directly to clipboard for quick sharing
+- **Enhanced Performance**:
+  - Streaming export for large codebases
+  - Progress tracking with detailed feedback
+  - Memory-efficient processing
+- **Advanced Filtering**:
+  - Exclude common directories (.git, node_modules, bin, obj, etc.)
+  - File size limits to skip huge files
+  - Binary file detection
+- **User Experience**:
+  - Drag & drop folder selection
+  - Recent folders dropdown
+  - Export statistics (file count, size, estimated lines)
+  - Persistent settings and preferences
+  - Detailed progress reporting
 - **Detailed Output Format**: Each file includes their relative location
 
 ## 📋 Prerequisites
