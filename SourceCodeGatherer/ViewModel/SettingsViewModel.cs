@@ -17,6 +17,7 @@ namespace SourceCodeGatherer.ViewModels
         private string _excludedDirectoriesText;
         private string _acceptedFileFormatsText;
         private bool _useStreaming;
+        private int _logRetentionDays;
 
         /// <summary>
         /// Initializes a new instance of the SettingsViewModel class.
@@ -32,6 +33,7 @@ namespace SourceCodeGatherer.ViewModels
             ExcludedDirectoriesText = string.Join(Environment.NewLine, _originalSettings.ExcludedDirectories);
             AcceptedFileFormatsText = string.Join(Environment.NewLine, _originalSettings.AcceptedFileFormats);
             UseStreaming = _originalSettings.UseStreaming;
+            LogRetentionDays = _originalSettings.LogRetentionDays;
 
             SaveCommand = new RelayCommand(ExecuteSave);
         }
@@ -67,6 +69,15 @@ namespace SourceCodeGatherer.ViewModels
             set => SetProperty(ref _useStreaming, value);
         }
 
+        /// <summary>
+        /// Gets or sets the number of days to retain log files.
+        /// </summary>
+        public int LogRetentionDays
+        {
+            get => _logRetentionDays;
+            set => SetProperty(ref _logRetentionDays, Math.Max(1, Math.Min(365, value))); // Clamp between 1 and 365 days
+        }
+
         #endregion
 
         #region Commands
@@ -98,6 +109,7 @@ namespace SourceCodeGatherer.ViewModels
                     .ToList();
 
                 _originalSettings.UseStreaming = UseStreaming;
+                _originalSettings.LogRetentionDays = LogRetentionDays;
 
                 await _settingsService.SaveSettingsAsync(_originalSettings);
             }

@@ -28,6 +28,7 @@ A professional Windows desktop application for collecting and exporting source c
   - Persistent settings and preferences
   - **Project-specific settings**: Window size, position, and preferences saved per project
   - Detailed progress reporting
+  - **Comprehensive logging**: Structured logging for troubleshooting and monitoring
 - **Detailed Output Format**: Each file includes their relative location
 
 ## 📋 Prerequisites
@@ -90,6 +91,33 @@ When you switch between different projects, the application automatically:
 - Suggests the last output path you used
 
 This makes it seamless to work with multiple projects without having to reconfigure settings each time.
+
+## 📊 Logging and Troubleshooting
+
+Source Code Gatherer includes comprehensive logging to help with troubleshooting and monitoring:
+
+- **Automatic Logging**: All operations are logged with timestamps and context
+- **Log Location**: `%LOCALAPPDATA%\SourceCodeGatherer\Logs\`
+- **Daily Rolling**: Logs are rotated daily with 7-day retention
+- **Structured Format**: Easy to read and search through logs
+- **Performance Metrics**: Operation timing and statistics are logged
+- **Error Tracking**: Detailed error information for troubleshooting
+
+**What gets logged:**
+- Application startup/shutdown and version information
+- File scanning operations and performance
+- Export operations (timing, file counts, errors)
+- Settings changes and project switches
+- User interface operations (drag/drop, window changes)
+- Error conditions and warnings
+- Log cleanup operations
+
+**Configuration:**
+- **Log Retention**: Configurable in Settings (default 30 days, range 1-365 days)
+- **Automatic Cleanup**: Old logs are automatically removed on application startup
+- **Location**: Logs are stored in `%LOCALAPPDATA%\SourceCodeGatherer\Logs\`
+
+For troubleshooting issues, check the latest log file in the logs directory. The logs are designed to protect privacy - no file contents are logged, only metadata and operation results.
 
 ## 📁 Output Format
 

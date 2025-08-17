@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using SourceCodeGatherer.Models;
 
 namespace SourceCodeGatherer.Services
@@ -13,6 +14,7 @@ namespace SourceCodeGatherer.Services
     /// </summary>
     public class FileService : IFileService
     {
+        private readonly ILogger<FileService> _logger;
         private readonly HashSet<string> _defaultTextExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             ".cs", ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
@@ -25,19 +27,52 @@ namespace SourceCodeGatherer.Services
             ".razor", ".fs", ".vb", ".vbs", ".asmx", ".aspx", ".jsp", ".jspx", ".makefile"
         };
 
+        /// <summary>
+        /// Initializes a new instance of the FileService class.
+        /// </summary>
+        public FileService()
+        {
+            _logger = App.LoggingService?.GetLogger<FileService>() ?? 
+                     Microsoft.Extensions.Logging.Abstractions.NullLogger<FileService>.Instance;
+            _logger.LogDebug("FileService initialized");
+        }
+
         /// <inheritdoc/>
         public async Task<IEnumerable<string>> GetFileExtensionsAsync(string rootPath, IEnumerable<string> excludedDirectories = null, IEnumerable<string> acceptedFormats = null)
         {
-            return await Task.Run(() =>
+            _logger.LogInformation("Starting file extension scan for path: {RootPath}", rootPath);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            try
             {
-                var excludedDirs = excludedDirectories?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
-                
-                return GetFilteredFiles(rootPath, excludedDirs, null, long.MaxValue, acceptedFormats)
-                    .Select(f => Path.GetExtension(f).ToLower())
-                    .Where(ext => !string.IsNullOrWhiteSpace(ext) && IsAcceptedFile(ext, acceptedFormats))
-                    .Distinct()
-                    .OrderBy(ext => ext);
-            });
+                return await Task.Run(() =>
+                {
+                    var excludedDirs = excludedDirectories?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
+                    _logger.LogDebug("Excluded directories: {ExcludedDirs}", string.Join(", ", excludedDirs));
+
+                    var extensions = GetFilteredFiles(rootPath, excludedDirs, null, long.MaxValue, acceptedFormats)
+                        .Select(f => Path.GetExtension(f).ToLower())
+                        .Where(ext => !string.IsNullOrWhiteSpace(ext) && IsAcceptedFile(ext, acceptedFormats))
+                        .Distinct()
+                        .OrderBy(ext => ext)
+                        .ToList();
+
+                    _logger.LogInformation("Found {ExtensionCount} unique file extensions in {ElapsedMs}ms", 
+                                         extensions.Count, stopwatch.ElapsedMilliseconds);
+                    _logger.LogDebug("Extensions found: {Extensions}", string.Join(", ", extensions));
+
+                    return extensions;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error scanning file extensions for path: {RootPath}", rootPath);
+                throw;
+            }
+            finally
+            {
+                stopwatch.Stop();
+            }
         }
 
         /// <inheritdoc/>
@@ -45,15 +80,37 @@ namespace SourceCodeGatherer.Services
             AppSettings settings = null, IProgress<ExportProgress> progress = null)
         {
             settings ??= new AppSettings();
+            var extensionList = selectedExtensions.ToList();
             
-            if (settings.UseStreaming)
+            _logger.LogInformation("Starting file export from {RootPath} to {OutputPath}", rootPath, outputPath);
+            _logger.LogInformation("Selected extensions: {Extensions}", string.Join(", ", extensionList));
+            _logger.LogInformation("Using streaming: {UseStreaming}, Max file size: {MaxFileSize} bytes", 
+                                 settings.UseStreaming, settings.MaxFileSizeBytes);
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            try
             {
-                await ExportFilesStreamAsync(rootPath, outputPath, selectedExtensions, settings, progress);
+                if (settings.UseStreaming)
+                {
+                    await ExportFilesStreamAsync(rootPath, outputPath, extensionList, settings, progress);
+                }
+                else
+                {
+                    var content = await ExportFilesToStringAsync(rootPath, extensionList, settings, progress);
+                    await File.WriteAllTextAsync(outputPath, content, Encoding.UTF8);
+                }
+
+                _logger.LogInformation("File export completed successfully in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
             }
-            else
+            catch (Exception ex)
             {
-                var content = await ExportFilesToStringAsync(rootPath, selectedExtensions, settings, progress);
-                await File.WriteAllTextAsync(outputPath, content, Encoding.UTF8);
+                _logger.LogError(ex, "Error during file export from {RootPath} to {OutputPath}", rootPath, outputPath);
+                throw;
+            }
+            finally
+            {
+                stopwatch.Stop();
             }
         }
 
@@ -64,12 +121,17 @@ namespace SourceCodeGatherer.Services
             settings ??= new AppSettings();
             var extensionSet = new HashSet<string>(selectedExtensions, StringComparer.OrdinalIgnoreCase);
 
+            _logger.LogDebug("Starting export to string for {RootPath}", rootPath);
+
             return await Task.Run(async () =>
             {
                 using var writer = new StringWriter();
                 var files = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, settings.MaxFileSizeBytes, settings.AcceptedFileFormats).ToList();
                 
+                _logger.LogInformation("Processing {FileCount} files for string export", files.Count);
+                
                 var progressInfo = new ExportProgress { TotalFiles = files.Count };
+                var errorCount = 0;
                 
                 for (int i = 0; i < files.Count; i++)
                 {
@@ -83,9 +145,16 @@ namespace SourceCodeGatherer.Services
                         await WriteFileContentAsync(writer, rootPath, file, settings.MaxFileSizeBytes);
                         var fileInfo = new FileInfo(file);
                         progressInfo.BytesProcessed += fileInfo.Length;
+                        
+                        if (i % 50 == 0) // Log progress every 50 files
+                        {
+                            _logger.LogDebug("Processed {ProcessedFiles}/{TotalFiles} files", i + 1, files.Count);
+                        }
                     }
                     catch (Exception ex)
                     {
+                        errorCount++;
+                        _logger.LogWarning(ex, "Error processing file {FilePath}", file);
                         progressInfo.ErrorMessage = $"Error processing {file}: {ex.Message}";
                         progress?.Report(progressInfo);
                     }
@@ -93,6 +162,9 @@ namespace SourceCodeGatherer.Services
 
                 progressInfo.FilesProcessed = files.Count;
                 progress?.Report(progressInfo);
+                
+                _logger.LogInformation("String export completed. Processed: {ProcessedFiles}, Errors: {ErrorCount}", 
+                                     files.Count, errorCount);
                 
                 return writer.ToString();
             });
@@ -105,13 +177,18 @@ namespace SourceCodeGatherer.Services
             settings ??= new AppSettings();
             var extensionSet = new HashSet<string>(selectedExtensions, StringComparer.OrdinalIgnoreCase);
 
+            _logger.LogDebug("Calculating export statistics for {RootPath}", rootPath);
+
             return await Task.Run(() =>
             {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                
                 var allFiles = GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, long.MaxValue, settings.AcceptedFileFormats).ToList();
                 var validFiles = new List<string>();
                 var skippedFiles = 0;
                 long totalSize = 0;
                 int estimatedLines = 0;
+                var errorCount = 0;
 
                 foreach (var file in allFiles)
                 {
@@ -128,21 +205,29 @@ namespace SourceCodeGatherer.Services
                         else
                         {
                             skippedFiles++;
+                            _logger.LogDebug("File {FilePath} skipped due to size: {FileSize} bytes", file, fileInfo.Length);
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         skippedFiles++;
+                        errorCount++;
+                        _logger.LogWarning(ex, "Error accessing file {FilePath} for statistics", file);
                     }
                 }
 
-                return new ExportStatistics
+                var statistics = new ExportStatistics
                 {
                     TotalFiles = validFiles.Count,
                     TotalSizeBytes = totalSize,
                     SkippedFiles = skippedFiles,
                     EstimatedLines = estimatedLines
                 };
+
+                _logger.LogInformation("Export statistics calculated in {ElapsedMs}ms: {ValidFiles} valid files, {SkippedFiles} skipped, {TotalSizeMB:F2} MB total, {Errors} errors",
+                                     stopwatch.ElapsedMilliseconds, validFiles.Count, skippedFiles, totalSize / 1024.0 / 1024.0, errorCount);
+
+                return statistics;
             });
         }
 
@@ -415,7 +500,7 @@ namespace SourceCodeGatherer.Services
         /// <summary>
         /// Writes file content to the output stream with enhanced error handling.
         /// </summary>
-        private static async Task WriteFileContentAsync(TextWriter writer, string rootPath, string filePath, long maxFileSize)
+        private async Task WriteFileContentAsync(TextWriter writer, string rootPath, string filePath, long maxFileSize)
         {
             var relativePath = Path.GetRelativePath(rootPath, filePath);
             await writer.WriteLineAsync($"=== FILE: {relativePath} ===");
@@ -427,24 +512,31 @@ namespace SourceCodeGatherer.Services
                 
                 if (fileInfo.Length > maxFileSize)
                 {
+                    _logger.LogDebug("File {FilePath} too large: {FileSize} bytes (limit: {MaxSize})", 
+                                   relativePath, fileInfo.Length, maxFileSize);
                     await writer.WriteLineAsync($"[FILE TOO LARGE: {fileInfo.Length:N0} bytes, limit is {maxFileSize:N0} bytes]");
                 }
                 else
                 {
                     var content = await File.ReadAllTextAsync(filePath);
                     await writer.WriteLineAsync(content);
+                    _logger.LogTrace("Successfully wrote content for file {FilePath} ({FileSize} bytes)", 
+                                   relativePath, fileInfo.Length);
                 }
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                _logger.LogWarning(ex, "Access denied to file {FilePath}", relativePath);
                 await writer.WriteLineAsync("[ERROR: Access denied]");
             }
             catch (IOException ex)
             {
+                _logger.LogWarning(ex, "IO error reading file {FilePath}", relativePath);
                 await writer.WriteLineAsync($"[ERROR: File in use or locked - {ex.Message}]");
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error reading file {FilePath}", relativePath);
                 await writer.WriteLineAsync($"[ERROR READING FILE: {ex.Message}]");
             }
 

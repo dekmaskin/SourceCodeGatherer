@@ -74,5 +74,10 @@ namespace SourceCodeGatherer.Models
         /// Gets or sets the project-specific window settings.
         /// </summary>
         public Dictionary<string, ProjectWindowSettings> ProjectSettings { get; set; } = new Dictionary<string, ProjectWindowSettings>();
+
+        /// <summary>
+        /// Gets or sets the number of days to retain log files (default 30 days).
+        /// </summary>
+        public int LogRetentionDays { get; set; } = 30;
     }
 }

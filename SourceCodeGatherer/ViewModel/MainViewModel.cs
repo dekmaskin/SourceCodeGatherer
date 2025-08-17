@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Extensions.Logging;
 using SourceCodeGatherer.Commands;
 using SourceCodeGatherer.Models;
 using SourceCodeGatherer.Services;
@@ -20,6 +21,7 @@ namespace SourceCodeGatherer.ViewModels
     {
         private readonly IFileService _fileService;
         private readonly ISettingsService _settingsService;
+        private readonly ILogger<MainViewModel> _logger;
         
         /// <summary>
         /// Event fired when directory scanning completes.
@@ -55,11 +57,17 @@ namespace SourceCodeGatherer.ViewModels
         {
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            _logger = App.LoggingService?.GetLogger<MainViewModel>() ?? 
+                     Microsoft.Extensions.Logging.Abstractions.NullLogger<MainViewModel>.Instance;
+
+            _logger.LogDebug("Initializing MainViewModel");
 
             FileExtensions = new ObservableCollection<FileExtensionItem>();
             RecentPaths = new ObservableCollection<string>();
             InitializeCommands();
             _ = LoadSettingsAsync();
+            
+            _logger.LogDebug("MainViewModel initialization completed");
         }
 
         #region Properties
@@ -296,20 +304,30 @@ namespace SourceCodeGatherer.ViewModels
 
         private async Task LoadSettingsAsync()
         {
+            _logger.LogInformation("Loading application settings");
+            
             try
             {
                 _settings = await _settingsService.LoadSettingsAsync();
                 
+                _logger.LogDebug("Settings loaded successfully. Recent paths: {RecentPathCount}, Max file size: {MaxFileSize} KB",
+                               _settings.RecentPaths?.Count ?? 0, _settings.MaxFileSizeKB);
+                
                 // Load recent paths
                 RecentPaths.Clear();
-                foreach (var path in _settings.RecentPaths.Where(Directory.Exists))
+                var validPaths = _settings.RecentPaths.Where(Directory.Exists).ToList();
+                foreach (var path in validPaths)
                 {
                     RecentPaths.Add(path);
                 }
+                
+                _logger.LogDebug("Loaded {ValidPathCount} valid recent paths out of {TotalPathCount}",
+                               validPaths.Count, _settings.RecentPaths?.Count ?? 0);
 
                 // Restore last paths if they exist
                 if (!string.IsNullOrWhiteSpace(_settings.LastRootPath) && Directory.Exists(_settings.LastRootPath))
                 {
+                    _logger.LogDebug("Restoring last root path: {RootPath}", _settings.LastRootPath);
                     RootPath = _settings.LastRootPath;
                 }
 
@@ -318,14 +336,16 @@ namespace SourceCodeGatherer.ViewModels
                     var directory = Path.GetDirectoryName(_settings.LastOutputPath);
                     if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
                     {
+                        _logger.LogDebug("Restoring last output path: {OutputPath}", _settings.LastOutputPath);
                         OutputPath = _settings.LastOutputPath;
                     }
                 }
 
                 StatusMessage = "Ready. Select a root directory to begin.";
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error loading settings, using defaults");
                 _settings = new AppSettings();
                 StatusMessage = "Select a root directory to begin.";
             }
@@ -395,6 +415,8 @@ namespace SourceCodeGatherer.ViewModels
 
         private async Task ScanDirectoryAsync()
         {
+            _logger.LogInformation("Starting directory scan for: {RootPath}", RootPath);
+            
             IsProcessing = true;
             FileExtensions.Clear();
             FileTypesVisibility = Visibility.Collapsed;
@@ -402,12 +424,16 @@ namespace SourceCodeGatherer.ViewModels
             StatusMessage = "Scanning directory...";
             ProgressText = "Scanning for file types...";
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
                 var extensions = await _fileService.GetFileExtensionsAsync(RootPath, _settings?.ExcludedDirectories, _settings?.AcceptedFileFormats);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
+                    var autoSelectedCount = 0;
+                    
                     foreach (var ext in extensions)
                     {
                         var item = new FileExtensionItem { Extension = ext };
@@ -416,11 +442,15 @@ namespace SourceCodeGatherer.ViewModels
                         if (_settings?.PreferredExtensions?.Contains(ext) == true)
                         {
                             item.IsChecked = true;
+                            autoSelectedCount++;
                         }
                         
                         item.PropertyChanged += OnFileExtensionItemPropertyChanged;
                         FileExtensions.Add(item);
                     }
+
+                    _logger.LogInformation("Directory scan completed in {ElapsedMs}ms. Found {ExtensionCount} file types, auto-selected {AutoSelectedCount}",
+                                         stopwatch.ElapsedMilliseconds, FileExtensions.Count, autoSelectedCount);
 
                     if (FileExtensions.Count > 0)
                     {
@@ -438,6 +468,7 @@ namespace SourceCodeGatherer.ViewModels
                     }
                     else
                     {
+                        _logger.LogWarning("No text files found in directory: {RootPath}", RootPath);
                         StatusMessage = "No text files found in the selected directory.";
                     }
 
@@ -465,6 +496,7 @@ namespace SourceCodeGatherer.ViewModels
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during directory scan for: {RootPath}", RootPath);
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     ShowError($"Error scanning directory: {ex.Message}");
@@ -475,6 +507,7 @@ namespace SourceCodeGatherer.ViewModels
             {
                 IsProcessing = false;
                 ProgressText = string.Empty;
+                stopwatch.Stop();
                 
                 // Fire event to notify that directory scan is complete
                 DirectoryScanCompleted?.Invoke(this, EventArgs.Empty);
@@ -578,17 +611,22 @@ namespace SourceCodeGatherer.ViewModels
 
         private async void ExecuteExport()
         {
+            var selectedExtensions = FileExtensions
+                .Where(x => x.IsChecked)
+                .Select(x => x.Extension)
+                .ToList();
+
+            _logger.LogInformation("Starting file export. Root: {RootPath}, Output: {OutputPath}, Extensions: {Extensions}, Managed files: {HasManagedFiles}",
+                                 RootPath, OutputPath, string.Join(", ", selectedExtensions), _managedFiles != null);
+
             IsProcessing = true;
             StatusMessage = "Exporting files...";
             ProgressValue = 0;
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
-                var selectedExtensions = FileExtensions
-                    .Where(x => x.IsChecked)
-                    .Select(x => x.Extension)
-                    .ToList();
-
                 var progress = new Progress<ExportProgress>(p =>
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -605,10 +643,13 @@ namespace SourceCodeGatherer.ViewModels
 
                 if (_managedFiles != null)
                 {
+                    var includedCount = _managedFiles.Count(f => f.IsIncluded);
+                    _logger.LogDebug("Exporting {IncludedCount} managed files out of {TotalCount}", includedCount, _managedFiles.Count);
                     await _fileService.ExportManagedFilesAsync(RootPath, OutputPath, _managedFiles, _settings, progress);
                 }
                 else
                 {
+                    _logger.LogDebug("Exporting files with {ExtensionCount} selected extensions", selectedExtensions.Count);
                     await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions, _settings, progress);
                 }
 
@@ -620,11 +661,13 @@ namespace SourceCodeGatherer.ViewModels
                     await _settingsService.SaveSettingsAsync(_settings);
                 }
 
+                _logger.LogInformation("File export completed successfully in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
                 StatusMessage = "Export completed successfully!";
                 ShowSuccess($"Export completed successfully!\nFile saved to: {OutputPath}");
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during file export");
                 ShowError($"Error during export: {ex.Message}");
                 StatusMessage = "Error occurred during export.";
             }
@@ -633,22 +676,28 @@ namespace SourceCodeGatherer.ViewModels
                 IsProcessing = false;
                 ProgressValue = 0;
                 ProgressText = string.Empty;
+                stopwatch.Stop();
             }
         }
 
         private async void ExecuteExportToClipboard()
         {
+            var selectedExtensions = FileExtensions
+                .Where(x => x.IsChecked)
+                .Select(x => x.Extension)
+                .ToList();
+
+            _logger.LogInformation("Starting clipboard export. Root: {RootPath}, Extensions: {Extensions}, Managed files: {HasManagedFiles}",
+                                 RootPath, string.Join(", ", selectedExtensions), _managedFiles != null);
+
             IsProcessing = true;
             StatusMessage = "Exporting to clipboard...";
             ProgressValue = 0;
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
-                var selectedExtensions = FileExtensions
-                    .Where(x => x.IsChecked)
-                    .Select(x => x.Extension)
-                    .ToList();
-
                 var progress = new Progress<ExportProgress>(p =>
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -666,10 +715,13 @@ namespace SourceCodeGatherer.ViewModels
                 string content;
                 if (_managedFiles != null)
                 {
+                    var includedCount = _managedFiles.Count(f => f.IsIncluded);
+                    _logger.LogDebug("Exporting {IncludedCount} managed files to clipboard out of {TotalCount}", includedCount, _managedFiles.Count);
                     content = await _fileService.ExportManagedFilesToStringAsync(RootPath, _managedFiles, _settings, progress);
                 }
                 else
                 {
+                    _logger.LogDebug("Exporting files to clipboard with {ExtensionCount} selected extensions", selectedExtensions.Count);
                     content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions, _settings, progress);
                 }
 
@@ -678,11 +730,14 @@ namespace SourceCodeGatherer.ViewModels
                     Clipboard.SetText(content);
                 });
 
+                _logger.LogInformation("Clipboard export completed successfully in {ElapsedMs}ms. Content length: {ContentLength} characters",
+                                     stopwatch.ElapsedMilliseconds, content.Length);
                 StatusMessage = "Exported to clipboard successfully!";
                 ShowSuccess("Content has been copied to clipboard!");
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during clipboard export");
                 ShowError($"Error during clipboard export: {ex.Message}");
                 StatusMessage = "Error occurred during clipboard export.";
             }
@@ -691,6 +746,7 @@ namespace SourceCodeGatherer.ViewModels
                 IsProcessing = false;
                 ProgressValue = 0;
                 ProgressText = string.Empty;
+                stopwatch.Stop();
             }
         }
 
@@ -709,16 +765,19 @@ namespace SourceCodeGatherer.ViewModels
 
         private async void ExecuteManageFiles()
         {
+            var selectedExtensions = FileExtensions
+                .Where(x => x.IsChecked)
+                .Select(x => x.Extension)
+                .ToList();
+
+            _logger.LogInformation("Starting file management for {ExtensionCount} selected extensions", selectedExtensions.Count);
+
             try
             {
                 IsProcessing = true;
                 StatusMessage = "Loading files for management...";
 
-                // Get all files that would be included in export
-                var selectedExtensions = FileExtensions
-                    .Where(x => x.IsChecked)
-                    .Select(x => x.Extension)
-                    .ToList();
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
                 var files = await Task.Run(() =>
                 {
@@ -727,7 +786,10 @@ namespace SourceCodeGatherer.ViewModels
                         .ToList();
                 });
 
+                _logger.LogDebug("Loaded {FileCount} files for management in {ElapsedMs}ms", files.Count, stopwatch.ElapsedMilliseconds);
+
                 // If we have managed files from previous session, restore their settings
+                var restoredCount = 0;
                 if (_managedFiles != null)
                 {
                     var managedDict = _managedFiles.ToDictionary(f => f.RelativePath);
@@ -737,8 +799,10 @@ namespace SourceCodeGatherer.ViewModels
                         {
                             file.IsIncluded = managedFile.IsIncluded;
                             file.IncludeContent = managedFile.IncludeContent;
+                            restoredCount++;
                         }
                     }
+                    _logger.LogDebug("Restored settings for {RestoredCount} files from previous session", restoredCount);
                 }
 
                 var viewModel = new FileManagementViewModel(files);
@@ -747,10 +811,16 @@ namespace SourceCodeGatherer.ViewModels
                     Owner = Application.Current.MainWindow
                 };
 
+                _logger.LogDebug("Opening file management window");
                 if (window.ShowDialog() == true)
                 {
                     // Save the managed files settings
                     _managedFiles = viewModel.AllFiles.ToList();
+                    var includedCount = _managedFiles.Count(f => f.IsIncluded);
+                    
+                    _logger.LogInformation("File management completed. {IncludedCount} files included out of {TotalCount}",
+                                         includedCount, _managedFiles.Count);
+                    
                     StatusMessage = "File management settings saved.";
                     
                     // Update statistics to reflect changes
@@ -758,11 +828,13 @@ namespace SourceCodeGatherer.ViewModels
                 }
                 else
                 {
+                    _logger.LogDebug("File management cancelled by user");
                     StatusMessage = "File management cancelled.";
                 }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during file management");
                 ShowError($"Error loading files for management: {ex.Message}");
                 StatusMessage = "Error occurred during file management.";
             }
