@@ -20,6 +20,11 @@ namespace SourceCodeGatherer.ViewModels
     {
         private readonly IFileService _fileService;
         private readonly ISettingsService _settingsService;
+        
+        /// <summary>
+        /// Event fired when directory scanning completes.
+        /// </summary>
+        public event EventHandler DirectoryScanCompleted;
         private AppSettings _settings;
         private string _rootPath;
         private string _outputPath;
@@ -32,6 +37,7 @@ namespace SourceCodeGatherer.ViewModels
         private Visibility _statisticsVisibility = Visibility.Collapsed;
         private ExportStatistics _exportStatistics;
         private List<FileItem> _managedFiles;
+        private ProjectWindowSettings _pendingProjectSettings;
 
         /// <summary>
         /// Initializes a new instance of the MainViewModel class.
@@ -419,6 +425,9 @@ namespace SourceCodeGatherer.ViewModels
                     if (FileExtensions.Count > 0)
                     {
                         FileTypesVisibility = Visibility.Visible;
+                        
+                        // Settings will be applied by MainWindow after scan completes
+                        
                         StatusMessage = $"Found {FileExtensions.Count} file types. Select the ones to include.";
                         
                         // Update statistics if any extensions are selected
@@ -466,6 +475,9 @@ namespace SourceCodeGatherer.ViewModels
             {
                 IsProcessing = false;
                 ProgressText = string.Empty;
+                
+                // Fire event to notify that directory scan is complete
+                DirectoryScanCompleted?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -945,6 +957,109 @@ namespace SourceCodeGatherer.ViewModels
                 }
             }
         }
+
+        #endregion
+
+        #region Project-Specific Settings Methods
+
+        /// <summary>
+        /// Gets the currently selected file extensions.
+        /// </summary>
+        /// <returns>List of selected extensions.</returns>
+        public List<string> GetSelectedExtensions()
+        {
+            return FileExtensions.Where(x => x.IsChecked).Select(x => x.Extension).ToList();
+        }
+
+        /// <summary>
+        /// Restores project-specific settings that can be applied immediately.
+        /// </summary>
+        /// <param name="projectSettings">The project settings to restore.</param>
+        public void RestoreImmediateProjectSettings(ProjectWindowSettings projectSettings)
+        {
+            if (projectSettings == null) return;
+
+            try
+            {
+                // Store settings to apply after directory scan completes
+                _pendingProjectSettings = projectSettings;
+
+                // Restore max file size immediately
+                if (projectSettings.MaxFileSizeKB > 0)
+                {
+                    MaxFileSizeKB = projectSettings.MaxFileSizeKB;
+                }
+
+                // Restore output path if it exists and the directory is valid
+                if (!string.IsNullOrWhiteSpace(projectSettings.LastOutputPath))
+                {
+                    var directory = Path.GetDirectoryName(projectSettings.LastOutputPath);
+                    if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                    {
+                        OutputPath = projectSettings.LastOutputPath;
+                    }
+                }
+            }
+            catch
+            {
+                // Silently fail - settings are not critical
+            }
+        }
+
+        /// <summary>
+        /// Restores project-specific settings after directory scan completes.
+        /// </summary>
+        /// <param name="projectSettings">The project settings to restore.</param>
+        public void RestoreProjectSettings(ProjectWindowSettings projectSettings)
+        {
+            if (projectSettings == null) return;
+
+            try
+            {
+                // Apply file extension settings
+                if (projectSettings.SelectedExtensions?.Count > 0)
+                {
+                    var appliedCount = 0;
+                    
+                    // First, uncheck all extensions
+                    foreach (var extension in FileExtensions)
+                    {
+                        extension.IsChecked = false;
+                    }
+                    
+                    // Then check the ones that should be selected
+                    foreach (var extension in FileExtensions)
+                    {
+                        if (projectSettings.SelectedExtensions.Contains(extension.Extension))
+                        {
+                            extension.IsChecked = true;
+                            appliedCount++;
+                        }
+                    }
+                    
+                    // Update status message to show settings were applied
+                    if (appliedCount > 0)
+                    {
+                        StatusMessage = $"Found {FileExtensions.Count} file types. Restored {appliedCount} selected extensions for this project.";
+                    }
+                    else
+                    {
+                        StatusMessage = $"Found {FileExtensions.Count} file types. No matching extensions found to restore.";
+                    }
+                }
+                else
+                {
+                    // No saved selections, use default behavior (keep current selections or use preferred extensions)
+                    StatusMessage = $"Found {FileExtensions.Count} file types. Select the ones to include.";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error restoring project settings: {ex.Message}";
+            }
+        }
+
+
 
         #endregion
     }

@@ -26,6 +26,7 @@ A professional Windows desktop application for collecting and exporting source c
   - Recent folders dropdown
   - Export statistics (file count, size, estimated lines)
   - Persistent settings and preferences
+  - **Project-specific settings**: Window size, position, and preferences saved per project
   - Detailed progress reporting
 - **Detailed Output Format**: Each file includes their relative location
 
@@ -72,6 +73,23 @@ Download the latest release from the [Releases](https://github.com/dekmaskin/Sou
 3. **Export Your Code**
    - **Export to File**: Saves to your Downloads folder by default (customizable)
    - **Export to Clipboard**: Instantly copies all code to clipboard
+
+## 💾 Project-Specific Settings
+
+Source Code Gatherer automatically saves and restores settings for each project you work with:
+
+- **Window Settings**: Size, position, and state (maximized/normal) are remembered per project
+- **File Type Preferences**: Your selected file extensions are saved for each project
+- **File Size Limits**: Custom file size limits per project
+- **Output Paths**: Last used output location for each project
+
+When you switch between different projects, the application automatically:
+- Restores your preferred window layout
+- Selects the file types you previously chose for that project
+- Applies your custom settings (file size limits, etc.)
+- Suggests the last output path you used
+
+This makes it seamless to work with multiple projects without having to reconfigure settings each time.
 
 ## 📁 Output Format
 

@@ -90,5 +90,38 @@ namespace SourceCodeGatherer.Services
 
             await SaveSettingsAsync(settings);
         }
+
+        /// <inheritdoc/>
+        public async Task<ProjectWindowSettings> GetProjectWindowSettingsAsync(string projectPath)
+        {
+            var settings = await LoadSettingsAsync();
+            
+            if (string.IsNullOrWhiteSpace(projectPath))
+                return new ProjectWindowSettings();
+
+            var normalizedPath = Path.GetFullPath(projectPath).ToLowerInvariant();
+            
+            if (settings.ProjectSettings.TryGetValue(normalizedPath, out var projectSettings))
+            {
+                return projectSettings;
+            }
+
+            return new ProjectWindowSettings { ProjectPath = normalizedPath };
+        }
+
+        /// <inheritdoc/>
+        public async Task SaveProjectWindowSettingsAsync(string projectPath, ProjectWindowSettings windowSettings)
+        {
+            if (string.IsNullOrWhiteSpace(projectPath))
+                return;
+
+            var settings = await LoadSettingsAsync();
+            var normalizedPath = Path.GetFullPath(projectPath).ToLowerInvariant();
+            
+            windowSettings.ProjectPath = normalizedPath;
+            settings.ProjectSettings[normalizedPath] = windowSettings;
+
+            await SaveSettingsAsync(settings);
+        }
     }
 }

@@ -25,5 +25,19 @@ namespace SourceCodeGatherer.Services
         /// </summary>
         /// <param name="path">The path to add.</param>
         Task AddRecentPathAsync(string path);
+
+        /// <summary>
+        /// Gets project-specific window settings for a given project path.
+        /// </summary>
+        /// <param name="projectPath">The project root path.</param>
+        /// <returns>The project window settings or default settings if none exist.</returns>
+        Task<ProjectWindowSettings> GetProjectWindowSettingsAsync(string projectPath);
+
+        /// <summary>
+        /// Saves project-specific window settings.
+        /// </summary>
+        /// <param name="projectPath">The project root path.</param>
+        /// <param name="windowSettings">The window settings to save.</param>
+        Task SaveProjectWindowSettingsAsync(string projectPath, ProjectWindowSettings windowSettings);
     }
 }

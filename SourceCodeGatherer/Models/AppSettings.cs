@@ -69,5 +69,10 @@ namespace SourceCodeGatherer.Models
         /// Gets or sets whether to use streaming for large exports.
         /// </summary>
         public bool UseStreaming { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the project-specific window settings.
+        /// </summary>
+        public Dictionary<string, ProjectWindowSettings> ProjectSettings { get; set; } = new Dictionary<string, ProjectWindowSettings>();
     }
 }
