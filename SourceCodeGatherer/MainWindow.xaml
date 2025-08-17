@@ -172,26 +172,44 @@
         <GroupBox Grid.Row="2" Header="Export Preview" Margin="0,0,0,10"
                   Visibility="{Binding StatisticsVisibility}">
             <Grid Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 
-                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                    <TextBlock Text="Files" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="{Binding ExportStatistics.TotalFiles}" HorizontalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="DarkBlue"/>
-                </StackPanel>
-                
-                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                    <TextBlock Text="Total Size" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="{Binding ExportStatistics.FormattedSize}" HorizontalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="DarkGreen"/>
-                </StackPanel>
-                
-                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                    <TextBlock Text="Est. Lines" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
-                    <TextBlock Text="{Binding ExportStatistics.EstimatedLines}" HorizontalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="DarkOrange"/>
-                </StackPanel>
+                <!-- Statistics -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <TextBlock Text="Files" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.TotalFiles}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkBlue"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock Text="Total Size" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.FormattedSize}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkGreen"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <TextBlock Text="Est. Lines" FontWeight="Bold" HorizontalAlignment="Center" FontSize="12"/>
+                        <TextBlock Text="{Binding ExportStatistics.EstimatedLines}" HorizontalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="DarkOrange"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                        <Button Content="Manage Files" 
+                            Command="{Binding ManageFilesCommand}"
+                            IsEnabled="{Binding CanManageFiles}"
+                            ToolTip="Select which files to include and exclude content"
+                            HorizontalAlignment="Center"
+                            MinWidth="120"/>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </GroupBox>
 
@@ -230,7 +248,6 @@
         <Grid Grid.Row="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>

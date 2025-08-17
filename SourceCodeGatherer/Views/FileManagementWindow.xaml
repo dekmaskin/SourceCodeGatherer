@@ -1,0 +1,158 @@
+<Window x:Class="SourceCodeGatherer.Views.FileManagementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Manage Export Files" Height="600" Width="900"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="MinWidth" Value="80"/>
+        </Style>
+        
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        
+        <Style x:Key="HeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Background" Value="LightGray"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="Manage Files for Export" 
+                   FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+
+        <!-- Search and Filter Controls -->
+        <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Search -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Label Grid.Column="0" Content="Search:" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" Name="SearchTextBox" Margin="5,0"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search by file name or path"/>
+                <Button Grid.Column="2" Content="Clear" 
+                        Command="{Binding ClearSearchCommand}"/>
+            </Grid>
+            
+            <!-- Bulk Actions -->
+            <Grid Grid.Row="1" Margin="0,5,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Select All" Command="{Binding SelectAllCommand}"/>
+                    <Button Content="Select None" Command="{Binding SelectNoneCommand}"/>
+                    <Button Content="Include All Content" Command="{Binding IncludeAllContentCommand}"/>
+                    <Button Content="Exclude All Content" Command="{Binding ExcludeAllContentCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- File List -->
+        <DataGrid Grid.Row="2" Name="FilesDataGrid"
+                  ItemsSource="{Binding FilteredFiles}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  CanUserSortColumns="True"
+                  GridLinesVisibility="Horizontal"
+                  AlternatingRowBackground="LightGray"
+                  SelectionMode="Extended">
+            
+            <DataGrid.Columns>
+                <!-- Include File Checkbox -->
+                <DataGridCheckBoxColumn Header="Include" 
+                                        Binding="{Binding IsIncluded, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="60"/>
+                
+                <!-- Include Content Checkbox -->
+                <DataGridCheckBoxColumn Header="Content" 
+                                        Binding="{Binding IncludeContent, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="60"/>
+                
+                <!-- Relative Directory Path -->
+                <DataGridTextColumn Header="Path" 
+                                    Binding="{Binding RelativeDirectory}"
+                                    SortMemberPath="RelativeDirectory"
+                                    Width="*"
+                                    IsReadOnly="True"/>
+                
+                <!-- File Name -->
+                <DataGridTextColumn Header="File Name" 
+                                    Binding="{Binding FileName}"
+                                    Width="200"
+                                    IsReadOnly="True"/>
+                
+                <!-- File Type -->
+                <DataGridTextColumn Header="Type" 
+                                    Binding="{Binding FileType}"
+                                    Width="120"
+                                    IsReadOnly="True"/>
+                
+                <!-- Size -->
+                <DataGridTextColumn Header="Size" 
+                                    Binding="{Binding FormattedSize}"
+                                    SortMemberPath="SizeBytes"
+                                    Width="80"
+                                    IsReadOnly="True"/>
+                
+                <!-- Last Modified -->
+                <DataGridTextColumn Header="Modified" 
+                                    Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}"
+                                    Width="130"
+                                    IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Status and Action Buttons -->
+        <Grid Grid.Row="3" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- Status -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusText}" Margin="0,0,10,0"/>
+                <TextBlock Text="{Binding IncludedFilesCount, StringFormat='Included: {0}'}" 
+                           FontWeight="Bold" Margin="0,0,10,0"/>
+                <TextBlock Text="{Binding ContentIncludedCount, StringFormat='With Content: {0}'}" 
+                           FontWeight="Bold"/>
+            </StackPanel>
+            
+            <!-- Action Buttons -->
+            <Button Grid.Column="1" Content="OK" 
+                    IsDefault="True"
+                    Command="{Binding OkCommand}"/>
+            <Button Grid.Column="2" Content="Cancel" 
+                    IsCancel="True"
+                    Command="{Binding CancelCommand}"/>
+        </Grid>
+    </Grid>
+</Window>

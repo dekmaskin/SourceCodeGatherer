@@ -153,6 +153,153 @@ namespace SourceCodeGatherer.Services
         }
 
         /// <summary>
+        /// Gets filtered files for management interface.
+        /// </summary>
+        public IEnumerable<string> GetFilteredFilesForManagement(string rootPath, IEnumerable<string> selectedExtensions, AppSettings settings = null)
+        {
+            settings ??= new AppSettings();
+            var extensionSet = new HashSet<string>(selectedExtensions, StringComparer.OrdinalIgnoreCase);
+            
+            return GetFilteredFiles(rootPath, settings.ExcludedDirectories, extensionSet, long.MaxValue, settings.AcceptedFileFormats);
+        }
+
+        /// <summary>
+        /// Exports managed files to a file with exclusion settings.
+        /// </summary>
+        public async Task ExportManagedFilesAsync(string rootPath, string outputPath, IEnumerable<FileItem> managedFiles, 
+            AppSettings settings = null, IProgress<ExportProgress> progress = null)
+        {
+            settings ??= new AppSettings();
+            
+            if (settings.UseStreaming)
+            {
+                await ExportManagedFilesStreamAsync(rootPath, outputPath, managedFiles, settings, progress);
+            }
+            else
+            {
+                var content = await ExportManagedFilesToStringAsync(rootPath, managedFiles, settings, progress);
+                await File.WriteAllTextAsync(outputPath, content, Encoding.UTF8);
+            }
+        }
+
+        /// <summary>
+        /// Exports managed files to a string with exclusion settings.
+        /// </summary>
+        public async Task<string> ExportManagedFilesToStringAsync(string rootPath, IEnumerable<FileItem> managedFiles,
+            AppSettings settings = null, IProgress<ExportProgress> progress = null)
+        {
+            settings ??= new AppSettings();
+            var includedFiles = managedFiles.Where(f => f.IsIncluded).ToList();
+
+            return await Task.Run(async () =>
+            {
+                using var writer = new StringWriter();
+                var progressInfo = new ExportProgress { TotalFiles = includedFiles.Count };
+                
+                for (int i = 0; i < includedFiles.Count; i++)
+                {
+                    var fileItem = includedFiles[i];
+                    progressInfo.CurrentFile = fileItem.RelativePath;
+                    progressInfo.FilesProcessed = i;
+                    progress?.Report(progressInfo);
+
+                    try
+                    {
+                        await WriteManagedFileContentAsync(writer, rootPath, fileItem, settings.MaxFileSizeBytes);
+                        progressInfo.BytesProcessed += fileItem.SizeBytes;
+                    }
+                    catch (Exception ex)
+                    {
+                        progressInfo.ErrorMessage = $"Error processing {fileItem.RelativePath}: {ex.Message}";
+                        progress?.Report(progressInfo);
+                    }
+                }
+
+                progressInfo.FilesProcessed = includedFiles.Count;
+                progress?.Report(progressInfo);
+                
+                return writer.ToString();
+            });
+        }
+
+        /// <summary>
+        /// Exports managed files using streaming for better memory efficiency.
+        /// </summary>
+        private async Task ExportManagedFilesStreamAsync(string rootPath, string outputPath, IEnumerable<FileItem> managedFiles,
+            AppSettings settings, IProgress<ExportProgress> progress)
+        {
+            var includedFiles = managedFiles.Where(f => f.IsIncluded).ToList();
+            var progressInfo = new ExportProgress { TotalFiles = includedFiles.Count };
+
+            using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+            using var writer = new StreamWriter(output, Encoding.UTF8);
+
+            for (int i = 0; i < includedFiles.Count; i++)
+            {
+                var fileItem = includedFiles[i];
+                progressInfo.CurrentFile = fileItem.RelativePath;
+                progressInfo.FilesProcessed = i;
+                progress?.Report(progressInfo);
+
+                try
+                {
+                    await WriteManagedFileContentAsync(writer, rootPath, fileItem, settings.MaxFileSizeBytes);
+                    progressInfo.BytesProcessed += fileItem.SizeBytes;
+                }
+                catch (Exception ex)
+                {
+                    progressInfo.ErrorMessage = $"Error processing {fileItem.RelativePath}: {ex.Message}";
+                    progress?.Report(progressInfo);
+                }
+            }
+
+            progressInfo.FilesProcessed = includedFiles.Count;
+            progress?.Report(progressInfo);
+        }
+
+        /// <summary>
+        /// Writes managed file content to the output stream with exclusion settings.
+        /// </summary>
+        private static async Task WriteManagedFileContentAsync(TextWriter writer, string rootPath, FileItem fileItem, long maxFileSize)
+        {
+            await writer.WriteLineAsync($"=== FILE: {fileItem.RelativePath} ===");
+            await writer.WriteLineAsync();
+
+            try
+            {
+                if (!fileItem.IncludeContent)
+                {
+                    await writer.WriteLineAsync("[CONTENT EXCLUDED BY USER]");
+                }
+                else if (fileItem.SizeBytes > maxFileSize)
+                {
+                    await writer.WriteLineAsync($"[FILE TOO LARGE: {fileItem.SizeBytes:N0} bytes, limit is {maxFileSize:N0} bytes]");
+                }
+                else
+                {
+                    var content = await File.ReadAllTextAsync(fileItem.FullPath);
+                    await writer.WriteLineAsync(content);
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                await writer.WriteLineAsync("[ERROR: Access denied]");
+            }
+            catch (IOException ex)
+            {
+                await writer.WriteLineAsync($"[ERROR: File in use or locked - {ex.Message}]");
+            }
+            catch (Exception ex)
+            {
+                await writer.WriteLineAsync($"[ERROR READING FILE: {ex.Message}]");
+            }
+
+            await writer.WriteLineAsync();
+            await writer.WriteLineAsync("=== END OF FILE ===");
+            await writer.WriteLineAsync();
+        }
+
+        /// <summary>
         /// Checks if a file extension is accepted based on settings.
         /// </summary>
         /// <param name="extension">The file extension to check.</param>

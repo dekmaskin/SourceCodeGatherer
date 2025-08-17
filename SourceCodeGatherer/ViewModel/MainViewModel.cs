@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -30,6 +31,7 @@ namespace SourceCodeGatherer.ViewModels
         private Visibility _fileTypesVisibility = Visibility.Collapsed;
         private Visibility _statisticsVisibility = Visibility.Collapsed;
         private ExportStatistics _exportStatistics;
+        private List<FileItem> _managedFiles;
 
         /// <summary>
         /// Initializes a new instance of the MainViewModel class.
@@ -68,7 +70,11 @@ namespace SourceCodeGatherer.ViewModels
                 {
                     UpdateDefaultOutputPath();
                     OnPropertyChanged(nameof(CanExport));
+                    OnPropertyChanged(nameof(CanManageFiles));
                     CommandManager.InvalidateRequerySuggested();
+
+                    // Clear managed files when root path changes
+                    _managedFiles = null;
 
                     // Automatically scan directory when path is set
                     if (!string.IsNullOrWhiteSpace(value) && Directory.Exists(value))
@@ -106,6 +112,8 @@ namespace SourceCodeGatherer.ViewModels
                 if (SetProperty(ref _isProcessing, value))
                 {
                     ProgressVisibility = value ? Visibility.Visible : Visibility.Collapsed;
+                    OnPropertyChanged(nameof(CanManageFiles));
+                    CommandManager.InvalidateRequerySuggested();
                 }
             }
         }
@@ -233,6 +241,20 @@ namespace SourceCodeGatherer.ViewModels
             set => MaxFileSizeKB = value * 1024.0;
         }
 
+        /// <summary>
+        /// Gets whether file management can be performed.
+        /// </summary>
+        public bool CanManageFiles
+        {
+            get
+            {
+                var canManage = !string.IsNullOrWhiteSpace(RootPath) && 
+                               FileExtensions.Any(x => x.IsChecked) &&
+                               !IsProcessing;
+                return canManage;
+            }
+        }
+
         #endregion
 
         #region Commands
@@ -242,6 +264,7 @@ namespace SourceCodeGatherer.ViewModels
         public ICommand ExportCommand { get; private set; }
         public ICommand ExportToClipboardCommand { get; private set; }
         public ICommand SelectRecentPathCommand { get; private set; }
+        public ICommand ManageFilesCommand { get; private set; }
 
         public ICommand SettingsCommand { get; private set; }
         public ICommand HelpCommand { get; private set; }
@@ -258,6 +281,7 @@ namespace SourceCodeGatherer.ViewModels
             ExportCommand = new RelayCommand(ExecuteExport, CanExecuteExport);
             ExportToClipboardCommand = new RelayCommand(ExecuteExportToClipboard, CanExecuteExport);
             SelectRecentPathCommand = new RelayCommand<string>(ExecuteSelectRecentPath);
+            ManageFilesCommand = new RelayCommand(ExecuteManageFiles, CanExecuteManageFiles);
 
             SettingsCommand = new RelayCommand(ExecuteSettings);
             HelpCommand = new RelayCommand(ExecuteHelp);
@@ -450,7 +474,11 @@ namespace SourceCodeGatherer.ViewModels
             if (e.PropertyName == nameof(FileExtensionItem.IsChecked))
             {
                 OnPropertyChanged(nameof(CanExport));
+                OnPropertyChanged(nameof(CanManageFiles));
                 CommandManager.InvalidateRequerySuggested();
+                
+                // Clear managed files when extension selection changes
+                _managedFiles = null;
                 
                 // Update statistics when selection changes
                 _ = UpdateStatisticsAsync();
@@ -483,21 +511,46 @@ namespace SourceCodeGatherer.ViewModels
 
             try
             {
-                var selectedExtensions = FileExtensions
-                    .Where(x => x.IsChecked)
-                    .Select(x => x.Extension)
-                    .ToList();
-
-                if (selectedExtensions.Any())
+                ExportStatistics stats;
+                
+                if (_managedFiles != null)
                 {
-                    var stats = await _fileService.GetExportStatisticsAsync(RootPath, selectedExtensions, _settings);
+                    // Calculate statistics from managed files
+                    var includedFiles = _managedFiles.Where(f => f.IsIncluded).ToList();
+                    var totalSize = includedFiles.Sum(f => f.SizeBytes);
+                    var estimatedLines = includedFiles.Sum(f => (int)(f.SizeBytes / 50)); // Rough estimate
                     
-                    Application.Current.Dispatcher.Invoke(() =>
+                    stats = new ExportStatistics
                     {
-                        ExportStatistics = stats;
-                        StatisticsVisibility = Visibility.Visible;
-                    });
+                        TotalFiles = includedFiles.Count,
+                        TotalSizeBytes = totalSize,
+                        SkippedFiles = _managedFiles.Count(f => !f.IsIncluded),
+                        EstimatedLines = estimatedLines
+                    };
                 }
+                else
+                {
+                    var selectedExtensions = FileExtensions
+                        .Where(x => x.IsChecked)
+                        .Select(x => x.Extension)
+                        .ToList();
+
+                    if (selectedExtensions.Any())
+                    {
+                        stats = await _fileService.GetExportStatisticsAsync(RootPath, selectedExtensions, _settings);
+                    }
+                    else
+                    {
+                        StatisticsVisibility = Visibility.Collapsed;
+                        return;
+                    }
+                }
+                
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ExportStatistics = stats;
+                    StatisticsVisibility = Visibility.Visible;
+                });
             }
             catch
             {
@@ -538,7 +591,14 @@ namespace SourceCodeGatherer.ViewModels
                     });
                 });
 
-                await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions, _settings, progress);
+                if (_managedFiles != null)
+                {
+                    await _fileService.ExportManagedFilesAsync(RootPath, OutputPath, _managedFiles, _settings, progress);
+                }
+                else
+                {
+                    await _fileService.ExportFilesAsync(RootPath, OutputPath, selectedExtensions, _settings, progress);
+                }
 
                 // Save settings
                 if (_settings != null && _settingsService != null)
@@ -591,7 +651,15 @@ namespace SourceCodeGatherer.ViewModels
                     });
                 });
 
-                var content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions, _settings, progress);
+                string content;
+                if (_managedFiles != null)
+                {
+                    content = await _fileService.ExportManagedFilesToStringAsync(RootPath, _managedFiles, _settings, progress);
+                }
+                else
+                {
+                    content = await _fileService.ExportFilesToStringAsync(RootPath, selectedExtensions, _settings, progress);
+                }
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -619,6 +687,76 @@ namespace SourceCodeGatherer.ViewModels
             if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
             {
                 RootPath = path;
+            }
+        }
+
+        private bool CanExecuteManageFiles()
+        {
+            return CanManageFiles;
+        }
+
+        private async void ExecuteManageFiles()
+        {
+            try
+            {
+                IsProcessing = true;
+                StatusMessage = "Loading files for management...";
+
+                // Get all files that would be included in export
+                var selectedExtensions = FileExtensions
+                    .Where(x => x.IsChecked)
+                    .Select(x => x.Extension)
+                    .ToList();
+
+                var files = await Task.Run(() =>
+                {
+                    return _fileService.GetFilteredFilesForManagement(RootPath, selectedExtensions, _settings)
+                        .Select(filePath => FileItem.FromPath(filePath, RootPath))
+                        .ToList();
+                });
+
+                // If we have managed files from previous session, restore their settings
+                if (_managedFiles != null)
+                {
+                    var managedDict = _managedFiles.ToDictionary(f => f.RelativePath);
+                    foreach (var file in files)
+                    {
+                        if (managedDict.TryGetValue(file.RelativePath, out var managedFile))
+                        {
+                            file.IsIncluded = managedFile.IsIncluded;
+                            file.IncludeContent = managedFile.IncludeContent;
+                        }
+                    }
+                }
+
+                var viewModel = new FileManagementViewModel(files);
+                var window = new Views.FileManagementWindow(viewModel)
+                {
+                    Owner = Application.Current.MainWindow
+                };
+
+                if (window.ShowDialog() == true)
+                {
+                    // Save the managed files settings
+                    _managedFiles = viewModel.AllFiles.ToList();
+                    StatusMessage = "File management settings saved.";
+                    
+                    // Update statistics to reflect changes
+                    _ = UpdateStatisticsAsync();
+                }
+                else
+                {
+                    StatusMessage = "File management cancelled.";
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Error loading files for management: {ex.Message}");
+                StatusMessage = "Error occurred during file management.";
+            }
+            finally
+            {
+                IsProcessing = false;
             }
         }
 

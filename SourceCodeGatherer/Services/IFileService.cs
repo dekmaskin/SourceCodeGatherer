@@ -64,5 +64,36 @@ namespace SourceCodeGatherer.Services
         /// <param name="filePath">The file path to check.</param>
         /// <returns>True if binary, false if text.</returns>
         Task<bool> IsBinaryFileAsync(string filePath);
+
+        /// <summary>
+        /// Gets filtered files for management interface.
+        /// </summary>
+        /// <param name="rootPath">The root directory path.</param>
+        /// <param name="selectedExtensions">Extensions to include.</param>
+        /// <param name="settings">Application settings for filtering and limits.</param>
+        /// <returns>Collection of file paths.</returns>
+        IEnumerable<string> GetFilteredFilesForManagement(string rootPath, IEnumerable<string> selectedExtensions, AppSettings settings = null);
+
+        /// <summary>
+        /// Exports managed files to a file with exclusion settings.
+        /// </summary>
+        /// <param name="rootPath">The root directory path.</param>
+        /// <param name="outputPath">The output file path.</param>
+        /// <param name="managedFiles">Managed files with inclusion settings.</param>
+        /// <param name="settings">Application settings for filtering and limits.</param>
+        /// <param name="progress">Progress reporter.</param>
+        Task ExportManagedFilesAsync(string rootPath, string outputPath, IEnumerable<FileItem> managedFiles, 
+            AppSettings settings = null, IProgress<ExportProgress> progress = null);
+
+        /// <summary>
+        /// Exports managed files to a string with exclusion settings.
+        /// </summary>
+        /// <param name="rootPath">The root directory path.</param>
+        /// <param name="managedFiles">Managed files with inclusion settings.</param>
+        /// <param name="settings">Application settings for filtering and limits.</param>
+        /// <param name="progress">Progress reporter.</param>
+        /// <returns>The exported content as a string.</returns>
+        Task<string> ExportManagedFilesToStringAsync(string rootPath, IEnumerable<FileItem> managedFiles,
+            AppSettings settings = null, IProgress<ExportProgress> progress = null);
     }
 }
