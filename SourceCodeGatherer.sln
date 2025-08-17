@@ -6,8 +6,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceCodeGatherer", "Sourc
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceCodeGatherer.Tests", "SourceCodeGatherer.Tests\SourceCodeGatherer.Tests.csproj", "{B2C3D4E5-F6G7-8901-BCDE-F23456789012}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceCodeGatherer.Installer", "SourceCodeGatherer.Installer\SourceCodeGatherer.Installer.wixproj", "{C3D4E5F6-G7H8-9012-CDEF-345678901234}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

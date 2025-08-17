@@ -11,8 +11,8 @@
 		<Company>Dekmaskin</Company>
 		<Product>Source Code Gatherer</Product>
 		<Description>A tool to gather source code files for AI context</Description>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.0.0</AssemblyVersion>
 
 		<PublishAot>false</PublishAot>
 		<SelfContained>false</SelfContained>
